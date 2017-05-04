@@ -23,6 +23,7 @@ def replaceChar(text):
         text = text.replace(ch, "")
     return text
 
+
 def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
                  kpsh=False, valley=False, show=False, ax=None):
     """Detect peaks in data based on their amplitude and other features.
@@ -158,6 +159,7 @@ def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
 
     return ind
 
+
 def _plot(x, mph, mpd, threshold, edge, valley, ax, ind):
     """Plot results of the detect_peaks function, see its help."""
     try:
@@ -186,3 +188,33 @@ def _plot(x, mph, mpd, threshold, edge, valley, ax, ind):
                      % (mode, str(mph), mpd, str(threshold), edge))
         # plt.grid()
         plt.show()
+
+
+def open_blob(data, open=None):
+    """
+    
+    :param data: 
+    :param open: numpy array with shape
+    :return: 
+    """
+    if open:
+        op_struck = open
+    else:
+        op_struck = np.ones((2, 2))
+    return ndimage.binary_opening(data, structure=op_struck)
+
+
+def close_blob(data, close=None):
+    """
+    
+    :param data: 
+    :param close: numpy array with shape
+    :return: 
+    """
+    if close:
+        cl_struck = close
+    else:
+        cl_struck = np.ones((1, 1))
+    close_img = ndimage.binary_closing(data, structure=cl_struck)
+    return np.invert(close_img)
+

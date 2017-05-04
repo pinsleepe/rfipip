@@ -7,8 +7,8 @@
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
-from rfiUtils import detect_peaks
-
+from rfiUtils import detect_peaks, open_blob
+from skimage import filters
 
 # Whole band
 # TODO add channel bw
@@ -201,10 +201,15 @@ class RfiObservation(object):
 
             self.freqs = f_delt * i_vals + f0
 
+            # In filterbank channel 0 is the highest frequency
+            # so invert
             if f_delt < 0:
                 self.freqs = self.freqs[::-1]
 
-    def _create_time(self, start_time, duration, block):
+    def _create_time(self,
+                     start_time,
+                     duration,
+                     block):
         """
 
         :param start_time:
@@ -214,11 +219,14 @@ class RfiObservation(object):
         """
         if self._fil_file:
             # TODO calc MJD for plotting and analysis
-            self.time = np.linspace(start_time, start_time+duration, num=block.shape[1])
+            self.time = np.linspace(start_time,
+                                    start_time+duration,
+                                    num=block.shape[1])
 
     # from rfDB2
     def get_rfi(self, data, sigma=4):
         """
+        OBSOLETE
         Get the rfi for the middle of the window
         Data is assumed to be a 2D array (y-axis Time, x-axis Frequency)
         and sigma is the standard deviation that is used
@@ -238,9 +246,12 @@ class RfiObservation(object):
         return mid_rfi, mad_limit
 
     # from rfDB2
-    def median_filter(self, f_data, window=10, sigma=4):
+    def median_filter(self,
+                      f_data,
+                      window=10,
+                      sigma=4):
         """
-
+        OBSOLETE
         :param f_data:
         :param window:
         :param sigma:
@@ -260,7 +271,54 @@ class RfiObservation(object):
         if self._fil_file:
             return rfi
 
-    def sum_dimension(self, data, axis=0):
+    def time_vector(self, vec_length):
+        """
+        
+        :param vec_length: int
+        :return: vecotr with start times and duration of a block 
+        """
+        start_vector = np.linspace(0,
+                                   self.file.header.tobs,
+                                   num=vec_length,
+                                   endpoint=False,
+                                   retstep=True)
+        return start_vector[0], start_vector[1]
+
+    def rfi_threshold(self, data_array):
+        """
+        Calculate threshold based on Yen algorithm
+        :param data_array: numpy array
+        :return: 
+        """
+        if self._fil_file:
+            return filters.threshold_yen(data_array)
+
+    def rfi_block(self, start_time, duration):
+        """
+        
+        :param start_time: 
+        :param duration: 
+        :return: 
+        """
+        block, _ = self.read_time_freq(start_time, duration)
+        return self.rfi_threshold(block)
+
+    def rfi_median(self, vec_length):
+        """
+        Run through entire file and give median value for threshold
+        :param vec_length: int, how many block there is in a file,
+                            need some logic...
+        :return: 
+        """
+        start_vector, duration = self.time_vector(vec_length)
+        obs_val = [self.rfi_block(st, duration) for _, st in enumerate(start_vector)]
+        return median(obs_val)
+
+
+
+    def sum_dimension(self,
+                      data,
+                      axis=0):
         """
 
         :param data: 2D array
@@ -281,7 +339,10 @@ class RfiObservation(object):
         if self._fil_file:
             self.bandpass = self.file.bandpass()
 
-    def plot_bandpass(self, data=None, ch_start=0, ch_stop=0):
+    def plot_bandpass(self,
+                      data=None,
+                      ch_start=0,
+                      ch_stop=0):
         """
         Works for summing 2D data along Y axis
         :param data:
@@ -308,8 +369,11 @@ class RfiObservation(object):
             ax.set_aspect('auto')
             plt.show()
 
-    # TODO axis ranges not right - fix
-    def plot_spectrum(self, data, ch_start, ch_stop):
+    # TODO axis ranges incorrect - fix
+    def plot_spectrum(self,
+                      data,
+                      ch_start,
+                      ch_stop):
         """
 
         :param data:
@@ -340,7 +404,9 @@ class RfiObservation(object):
         ax.set_aspect('auto')
         plt.show()
 
-    def plot_mask(self, mask, start_time):
+    def plot_mask(self,
+                  mask,
+                  start_time):
         start_sample = long(start_time / self.file.header.tsamp)
 
         plt.figure()
@@ -356,7 +422,10 @@ class RfiObservation(object):
         plt.colorbar()
         plt.show()
 
-    def find_rfi_events(self, mask_rfi, threshold=10, show=False):
+    def find_rfi_events(self,
+                        mask_rfi,
+                        threshold=10,
+                        show=False):
         """
 
         :param mask_rfi:
@@ -372,7 +441,9 @@ class RfiObservation(object):
         rfi_events = detect_peaks(mask_bp, mph=threshold, show=show)
         return rfi_events, rfi_events.shape[0]
 
-    def read_time_freq(self, start_time, duration):
+    def read_time_freq(self,
+                       start_time,
+                       duration):
         """
 
         :param start_time:
@@ -383,7 +454,10 @@ class RfiObservation(object):
             block, nsamples = self.read_file(start_time, duration)
             return block, nsamples
 
-    def plot_time_freq(self, start_time, duration, zeros=False):
+    def plot_time_freq(self,
+                       start_time,
+                       duration,
+                       zeros=False):
         """
 
         :param start_time:
@@ -440,50 +514,50 @@ class RfiObservation(object):
             plt.show()
 
 
-class RfiEvent(object):
-    """
-
-    """
-    def __init__(self,
-                 mode=0,
-                 peak_channel=None,
-                 freq_vector=None,
-                 arr_data=None):
-
-        self.time_occupancy = None
-        self.peak_channel = peak_channel
-        self.peak_freq = None
-        self.bandwidth = None
-        self.mode = mode  # not used atm
-        self.data = None
-
-        self.init(freq_vector, arr_data)
-
-    def init(self, freq_vector, arr_data):
-        """
-
-        :param freq_vector:
-        :param arr_data:
-        :return:
-        """
-        self.chan_to_freq(self.peak_channel, freq_vector)
-        self.grab_data(arr_data)
-
-    # from rfDB2
-    def chan_to_freq(self, chan, freq_vector):
-        """
-        Returns the channel number where a given frequency is to be found.
-        Frequency is in Hz.
-        :param freq_vector:
-        :param chan:
-        :return:
-        """
-        self.peak_freq = freq_vector[chan]
-
-    def grab_data(self, arr):
-        """
-
-        :return:
-        """
-        num_samples = 50  # TODO hardcoded, choose 50 samples around event
-        self.data = arr[:, self.peak_channel - num_samples: self.peak_channel + num_samples]
+# class RfiEvent(object):
+#     """
+#
+#     """
+#     def __init__(self,
+#                  mode=0,
+#                  peak_channel=None,
+#                  freq_vector=None,
+#                  arr_data=None):
+#
+#         self.time_occupancy = None
+#         self.peak_channel = peak_channel
+#         self.peak_freq = None
+#         self.bandwidth = None
+#         self.mode = mode  # not used atm
+#         self.data = None
+#
+#         self.init(freq_vector, arr_data)
+#
+#     def init(self, freq_vector, arr_data):
+#         """
+#
+#         :param freq_vector:
+#         :param arr_data:
+#         :return:
+#         """
+#         self.chan_to_freq(self.peak_channel, freq_vector)
+#         self.grab_data(arr_data)
+#
+#     # from rfDB2
+#     def chan_to_freq(self, chan, freq_vector):
+#         """
+#         Returns the channel number where a given frequency is to be found.
+#         Frequency is in Hz.
+#         :param freq_vector:
+#         :param chan:
+#         :return:
+#         """
+#         self.peak_freq = freq_vector[chan]
+#
+#     def grab_data(self, arr):
+#         """
+#
+#         :return:
+#         """
+#         num_samples = 50  # TODO hardcoded, choose 50 samples around event
+#         self.data = arr[:, self.peak_channel - num_samples: self.peak_channel + num_samples]
