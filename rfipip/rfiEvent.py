@@ -70,7 +70,7 @@ class RfiEvent(object):
             temp_dur = self.duration * t_df
         # no
         else:
-            temp_freq = freqs_v[tf_extent[ev][1]]
+            temp_freq = freqs_v[self.c_freq]
             temp_bw = foff
             temp_dur = t_df
 
