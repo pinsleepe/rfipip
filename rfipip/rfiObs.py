@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from rfiUtils import detect_peaks, open_blob
 from skimage import filters
+from statistics import median
 
 # Whole band
 # TODO add channel bw
