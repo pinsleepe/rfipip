@@ -3,6 +3,7 @@
 
 MANIFEST
 dist/
+rfipip/*.pyc
 
 # User-specific stuff:
 .idea/**/workspace.xml
