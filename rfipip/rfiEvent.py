@@ -108,10 +108,12 @@ class RfiEvent(object):
             f_range = f_range
         else:
             f_range = 1
-        if full_dict[range_dict[band]]['frequencies']:
+        if full_dict[range_dict[band]]['frequencies'] is not []:
             culprit = [(1, full_dict[range_dict[band]]['frequencies'][av_f])
                        for av_f in full_dict[range_dict[band]]['frequencies'].keys()
                        if (float(av_f) - f_range) <= self.c_freq <= (float(av_f) + f_range)]
+            if culprit is []:
+                culprit = [(0, 'Unknown')]
         else:
             culprit = [(0, 'Unknown')]
         return culprit
