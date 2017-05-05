@@ -85,11 +85,12 @@ class RfiEvent(object):
         :param range_dict: dict {0: '47.0-87.5'}
         :return: 
         """
+
         self.band = [key
                      for key in range_dict.keys()
-                     if float(f_range[key].split('-')[0]) <=
+                     if float(range_dict[key].split('-')[0]) <=
                      self.c_freq <=
-                     float(f_range[key].split('-')[1])]
+                     float(range_dict[key].split('-')[1])]
 
     def _find_culprit_freq(self,
                            full_dict,
