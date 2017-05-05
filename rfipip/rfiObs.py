@@ -7,7 +7,7 @@
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
-from rfiUtils import detect_peaks, open_blob
+from rfiUtils import detect_peaks
 from skimage import filters
 from statistics import median
 
