@@ -116,7 +116,7 @@ class RfiEvent(object):
                 culprit = [(0, 'Unknown')]
         else:
             culprit = [(0, 'Unknown')]
-        return culprit
+        return culprit[0]
 
     def find_culprit(self, full_dict, range_dict):
         """
