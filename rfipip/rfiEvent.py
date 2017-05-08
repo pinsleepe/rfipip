@@ -36,11 +36,9 @@ class RfiEvent(object):
         
         :return: 
         """
-        # x, y = np.where(labeled_array == self.event)
         ev = np.where(labeled_array[non_zero_array] == self.event)
         x = non_zero_array[0][ev]
         y = non_zero_array[1][ev]
-        # return x, y
         return x, y
 
     def assign_attr(self, x, y):
@@ -83,7 +81,8 @@ class RfiEvent(object):
         self.c_freq = temp_freq
         self.duration = temp_dur
         self.bw = temp_bw
-        self.t_start = time_v
+        ts = self.t_start
+        self.t_start = time_v[ts]
 
     def find_bands(self, range_dict):
         """
