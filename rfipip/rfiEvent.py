@@ -6,7 +6,8 @@ class RfiEvent(object):
     """
     def __init__(self,
                  event,
-                 labeled_array):
+                 labeled_array,
+                 non_zero_arr):
 
         self.event = event
         self.c_freq = None
@@ -18,23 +19,28 @@ class RfiEvent(object):
         self.description = []
         self.band = []
 
-        self.init(labeled_array)
+        self.init(labeled_array, non_zero_arr)
 
-    def init(self, labeled_array):
+    def init(self, labeled_array, non_zero_arr):
         """
         
         :param labeled_array: 
         :return: 
         """
-        f, t = self.look_4_event(labeled_array)
+        # non_zero_arr = labeled_array.nonzero()
+        f, t = self.look_4_event(labeled_array, non_zero_arr)
         self.assign_attr(f, t)
 
-    def look_4_event(self, labeled_array):
+    def look_4_event(self, labeled_array, non_zero_array):
         """
         
         :return: 
         """
-        x, y = np.where(labeled_array == self.event)
+        # x, y = np.where(labeled_array == self.event)
+        ev = np.where(labeled_array[non_zero_array] == self.event)
+        x = non_zero_array[0][ev]
+        y = non_zero_array[1][ev]
+        # return x, y
         return x, y
 
     def assign_attr(self, x, y):
