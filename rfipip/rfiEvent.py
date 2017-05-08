@@ -128,8 +128,8 @@ class RfiEvent(object):
         """
         culprit_info = [self._find_culprit_freq(full_dict, range_dict, band)
                         for band in self.band]
-        self.culprit = [culprit_info[cul][0] for cul in culprit_info]
-        self.description = [culprit_info[cul][1] for cul in culprit_info]
+        self.culprit = [cul[0] for cul in culprit_info]
+        self.description = [cul[1] for cul in culprit_info]
         # return dict(zip(self.band, culprit_info))
 
     # def chan_to_freq(self, chan, freq_vector):
