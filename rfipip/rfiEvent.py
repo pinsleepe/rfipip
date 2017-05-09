@@ -19,6 +19,8 @@ class RfiEvent(object):
         self.description = []
         self.band = []
 
+        self.init_info = None
+
         self.init(labeled_array, non_zero_arr)
 
     def init(self, labeled_array, non_zero_arr):
@@ -48,10 +50,14 @@ class RfiEvent(object):
         :param y: 
         :return: 
         """
-        self.c_freq = x[0]
-        self.channel = x.max() - x[0]
-        self.t_start = y[0]
-        self.duration = y.max() - y[0]
+        # c_freq 0
+        # channel 1
+        # t_start 2
+        # duration 3
+        self.init_info = [x[0],
+                          x.max() - x[0],
+                          y[0],
+                          y.max() - y[0]]
 
     def finetune_attr(self, foff,
                       freqs_v,
@@ -67,25 +73,24 @@ class RfiEvent(object):
         """
         # check if the event occupies more than one channel
         # yes
-        if self.channel > 0:
+        if self.init_info[1] > 0:
             # freq channels times BW
-            temp_bw = self.channel * foff
+            temp_bw = self.init_info[1] * foff
             # freq of middle channel
-            temp_freq = freqs_v[self.c_freq] + temp_bw / 2.0
-            # # duration
-            # temp_dur = self.duration * t_df
+            temp_freq = freqs_v[self.init_info[0]] + temp_bw / 2.0
         # no
         else:
-            temp_freq = freqs_v[self.c_freq]
+            temp_freq = freqs_v[self.init_info[0]]
             temp_bw = foff
-            # temp_dur = t_df
         # duration
-        temp_dur = self.duration * t_df
+        if self.init_info[3] == 0:
+            temp_dur = t_df
+        else:
+            temp_dur = self.init_info[3] * t_df
         self.c_freq = temp_freq
         self.duration = temp_dur
         self.bw = temp_bw
-        ts = self.t_start
-        self.t_start = time_v[ts]
+        self.t_start = time_v[self.init_info[2]]
 
     def find_bands(self, range_dict):
         """
