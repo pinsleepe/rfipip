@@ -65,19 +65,22 @@ class RfiEvent(object):
         :param time_v: fil_rfiObs.time
         :return: 
         """
+        # check if the event occupies more than one channel
+        # yes
         if self.channel > 0:
             # freq channels times BW
             temp_bw = self.channel * foff
             # freq of middle channel
             temp_freq = freqs_v[self.c_freq] + temp_bw / 2.0
-            # duration
-            temp_dur = self.duration * t_df
+            # # duration
+            # temp_dur = self.duration * t_df
         # no
         else:
             temp_freq = freqs_v[self.c_freq]
             temp_bw = foff
-            temp_dur = t_df
-
+            # temp_dur = t_df
+        # duration
+        temp_dur = self.duration * t_df
         self.c_freq = temp_freq
         self.duration = temp_dur
         self.bw = temp_bw
