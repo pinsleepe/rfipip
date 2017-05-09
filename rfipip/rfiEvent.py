@@ -58,6 +58,7 @@ class RfiEvent(object):
                           x.max() - x[0],
                           y[0],
                           y.max() - y[0]]
+        self.channel = self.init_info[1]
 
     def finetune_attr(self, foff,
                       freqs_v,
