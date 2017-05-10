@@ -538,7 +538,7 @@ class RfiObservation(object):
                           self.freqs,
                           t_df, self.time) for ev in rfi_evs]
         [ev.find_bands(int_dict) for ev in rfi_evs]
-        [ev.find_culprit(rfiDb.dictionary, int_dict) for ev in rfi_evs]
+        [ev.find_culprit(self.database.dictionary, int_dict) for ev in rfi_evs]
         return rfi_evs
 
     def obs_events(self, start_time, duration, int_dict):
