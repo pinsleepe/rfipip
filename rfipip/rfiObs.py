@@ -497,6 +497,11 @@ class RfiObservation(object):
         return block < self.threshold
 
     def clean_mask(self, mask):
+        """
+        
+        :param mask: 
+        :return: 
+        """
         open_img = rfiUtils.open_blob(mask)
         return rfiUtils.close_blob(open_img)
 
@@ -541,7 +546,7 @@ class RfiObservation(object):
         [ev.find_culprit(self.database.dictionary, int_dict) for ev in rfi_evs]
         return rfi_evs
 
-    def obs_events(self, start_time, duration, int_dict):
+    def find_obs_event(self, start_time, duration, int_dict):
         """
         
         :param start_time: 
@@ -550,7 +555,19 @@ class RfiObservation(object):
         """
         block, num_sam = self.read_time_freq(start_time,
                                              duration)
-        self.events = [self.block_events(block, int_dict)]
+        return self.block_events(block, int_dict)
+
+    def obs_event(self, vec_length, int_dict):
+        """
+        
+        :param vec_length: 
+        :param int_dict: 
+        :return: 
+        """
+        start_vector, duration = self.time_vector(vec_length)
+        self.events = [self.find_obs_events(start_vector[sv],
+                                            duration,
+                                            int_dict) for sv in range(vec_length)]
 
         #
     # # from rfDB2

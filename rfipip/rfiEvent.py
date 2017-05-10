@@ -147,6 +147,9 @@ class RfiEvent(object):
         self.description = [cul[1] for cul in culprit_info]
         # return dict(zip(self.band, culprit_info))
 
+    def clean_culprit_info(self):
+
+
     # def chan_to_freq(self, chan, freq_vector):
     #     """
     #     OBSOLETE
