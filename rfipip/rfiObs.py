@@ -557,7 +557,7 @@ class RfiObservation(object):
                                              duration)
         return self.block_events(block, int_dict)
 
-    def obs_event(self, vec_length, int_dict):
+    def obs_events(self, vec_length, int_dict):
         """
         
         :param vec_length: 
