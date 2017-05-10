@@ -565,9 +565,9 @@ class RfiObservation(object):
         :return: 
         """
         start_vector, duration = self.time_vector(vec_length)
-        self.events = [self.find_obs_events(start_vector[sv],
-                                            duration,
-                                            int_dict) for sv in range(vec_length)]
+        self.events = [self.find_obs_event(start_vector[sv],
+                                           duration,
+                                           int_dict) for sv in range(vec_length)]
 
         #
     # # from rfDB2
