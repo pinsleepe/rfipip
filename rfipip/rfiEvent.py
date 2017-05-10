@@ -145,9 +145,42 @@ class RfiEvent(object):
                         for band in self.band]
         self.culprit = [cul[0] for cul in culprit_info]
         self.description = [cul[1] for cul in culprit_info]
-        # return dict(zip(self.band, culprit_info))
+        self.clean_culprit_info()
 
     def clean_culprit_info(self):
+        """
+        
+        :return: 
+        """
+        # clean up descriptions
+        known_idx = [i for i, x in enumerate(self.culprit) if x == 1]
+        # more than one culprit identified
+        if len(known_idx) > 1:
+            # check if all are the same
+            list_ones = [self.description[x] for i, x in enumerate(known_idx)]
+            # yes
+            if list_ones.count(list_ones[0]) == len(list_ones):
+                self.culprit = 1
+                self.description = list_ones[0]
+            # no
+            else:
+                unique = set(list_ones)
+                self.description = list(unique)
+                self.culprit = [1]*len(unique)
+        # one culprit identified
+        if len(known_idx) == 1:
+            self.culprit = 1
+            clean_d = self.description[known_idx[0]]
+            self.description = clean_d
+        # no culprit identified
+        if len(known_idx) == 0:
+            self.culprit = 0
+            self.description = 'Unknown'
+
+        # integers to a string for data frame
+        clean_band = '-'.join(str(x) for x in self.band)
+        self.band = clean_band
+
         return
 
     # def chan_to_freq(self, chan, freq_vector):
