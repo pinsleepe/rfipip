@@ -577,6 +577,7 @@ class RfiObservation(object):
         :return: 
         """
         # TODO get rid of for loops
+        # TODO reset idx in csv file
         columns = ('event',
                    'c_freq',
                    'bw',
