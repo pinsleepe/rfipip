@@ -482,7 +482,7 @@ class RfiObservation(object):
         
         :param corrupted_samples: fil_rfiObs
         :param close_img: 
-        :return: 
+        :return: int_dict
         """
         corrupt_block = np.count_nonzero(close_img == 1)
         self.corrupted_samples += corrupt_block
@@ -540,7 +540,7 @@ class RfiObservation(object):
         [ev.find_culprit(rfiDb.dictionary, int_dict) for ev in rfi_evs]
         return rfi_evs
 
-    def obs_events(self, start_time, duration):
+    def obs_events(self, start_time, duration, int_dict):
         """
         
         :param start_time: 
@@ -548,10 +548,10 @@ class RfiObservation(object):
         :return: 
         """
         block, num_sam = self.read_time_freq(start_time,
-                                                   duration)
+                                             duration)
         self.events = [self.block_events(block, int_dict)]
 
-    #
+        #
     # # from rfDB2
     # def get_rfi(self, data, sigma=4):
     #     """
