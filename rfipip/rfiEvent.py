@@ -148,7 +148,7 @@ class RfiEvent(object):
         # return dict(zip(self.band, culprit_info))
 
     def clean_culprit_info(self):
-
+        return 
 
     # def chan_to_freq(self, chan, freq_vector):
     #     """
