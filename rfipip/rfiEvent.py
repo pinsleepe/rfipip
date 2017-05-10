@@ -164,6 +164,7 @@ class RfiEvent(object):
                 self.description = list_ones[0]
             # no
             else:
+                # add new label?
                 unique = set(list_ones)
                 self.description = list(unique)
                 self.culprit = [1]*len(unique)
@@ -182,22 +183,3 @@ class RfiEvent(object):
         self.band = clean_band
 
         return
-
-    # def chan_to_freq(self, chan, freq_vector):
-    #     """
-    #     OBSOLETE
-    #     Returns the channel number where a given frequency is to be found.
-    #     Frequency is in Hz.
-    #     :param freq_vector:
-    #     :param chan:
-    #     :return:
-    #     """
-    #     self.peak_freq = freq_vector[chan]
-    #
-    # def grab_data(self, arr):
-    #     """
-    #     OBSOLETE
-    #     :return:
-    #     """
-    #     num_samples = 50  # TODO hardcoded, choose 50 samples around event
-    #     self.data = arr[:, self.peak_channel - num_samples: self.peak_channel + num_samples]

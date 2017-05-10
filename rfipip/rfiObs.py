@@ -29,15 +29,6 @@ rta_modes = {'1': {'n_chan': 32768,
                    'top_freq': 2699972534.18,
                    'base_freq': 1800000000.0}}
 
-training_set = pd.DataFrame(columns=('event',
-                                     'c_freq',
-                                     'bw',
-                                     't_start',
-                                     'duration',
-                                     'culprit',
-                                     'description',
-                                     'band'))
-
 
 class RfiObservation(object):
     def __init__(self,
@@ -247,12 +238,13 @@ class RfiObservation(object):
         :param vec_length: int
         :return: vecotr with start times and duration of a block 
         """
-        start_vector = np.linspace(0,
-                                   self.file.header.tobs,
-                                   num=vec_length,
-                                   endpoint=False,
-                                   retstep=True)
-        return start_vector[0], start_vector[1]
+        if self._fil_file:
+            start_vector = np.linspace(0,
+                                       self.file.header.tobs,
+                                       num=vec_length,
+                                       endpoint=False,
+                                       retstep=True)
+            return start_vector[0], start_vector[1]
 
     def rfi_threshold(self, data_array):
         """
@@ -270,8 +262,9 @@ class RfiObservation(object):
         :param duration: 
         :return: 
         """
-        block, _ = self.read_time_freq(start_time, duration)
-        return self.rfi_threshold(block)
+        if self._fil_file:
+            block, _ = self.read_time_freq(start_time, duration)
+            return self.rfi_threshold(block)
 
     def rfi_median(self, vec_length):
         """
@@ -280,10 +273,10 @@ class RfiObservation(object):
                             need some logic...
         :return: 
         """
-        start_vector, duration = self.time_vector(vec_length)
-        obs_val = [self.rfi_block(st, duration) for _, st in enumerate(start_vector)]
-        self.threshold = median(obs_val)
-        # return median(obs_val)
+        if self._fil_file:
+            start_vector, duration = self.time_vector(vec_length)
+            obs_val = [self.rfi_block(st, duration) for _, st in enumerate(start_vector)]
+            self.threshold = median(obs_val)
 
     def sum_dimension(self,
                       data,
@@ -485,8 +478,9 @@ class RfiObservation(object):
         :param close_img: 
         :return: int_dict
         """
-        corrupt_block = np.count_nonzero(close_img == 1)
-        self.corrupted_samples += corrupt_block
+        if self._fil_file:
+            corrupt_block = np.count_nonzero(close_img == 1)
+            self.corrupted_samples += corrupt_block
 
     def apply_threshold(self, block):
         """
@@ -511,10 +505,11 @@ class RfiObservation(object):
         :param close_img: 
         :return: 
         """
-        labeled_array, num_features = measurements.label(close_img)
-        self._count_corrupted(close_img)
-        non_zero_array = labeled_array.nonzero()
-        return labeled_array, num_features, non_zero_array
+        if self._fil_file:
+            labeled_array, num_features = measurements.label(close_img)
+            self._count_corrupted(close_img)
+            non_zero_array = labeled_array.nonzero()
+            return labeled_array, num_features, non_zero_array
 
     def find_rfi_events(self, block):
         """
@@ -522,10 +517,11 @@ class RfiObservation(object):
         :param block: 
         :return: 
         """
-        mask = self.apply_threshold(block)
-        close_img = self.clean_mask(mask)
-        labeled_array, num_features, non_zero_array = self.mask_events(close_img)
-        return labeled_array, num_features, non_zero_array
+        if self._fil_file:
+            mask = self.apply_threshold(block)
+            close_img = self.clean_mask(mask)
+            labeled_array, num_features, non_zero_array = self.mask_events(close_img)
+            return labeled_array, num_features, non_zero_array
 
     def block_events(self, block, int_dict):
         """
@@ -534,17 +530,18 @@ class RfiObservation(object):
         :param int_dict: 
         :return: 
         """
-        labeled_array, num_features, non_zero_array = self.find_rfi_events(block)
-        feature_range = np.linspace(1, num_features, num=num_features)
-        rfi_evs = [rfiEvent.RfiEvent(ev, labeled_array, non_zero_array)
-                   for ev in feature_range]
-        t_df = self.time[1] - self.time[0]
-        [ev.finetune_attr(self.file.header.foff,
-                          self.freqs,
-                          t_df, self.time) for ev in rfi_evs]
-        [ev.find_bands(int_dict) for ev in rfi_evs]
-        [ev.find_culprit(self.database.dictionary, int_dict) for ev in rfi_evs]
-        return rfi_evs
+        if self._fil_file:
+            labeled_array, num_features, non_zero_array = self.find_rfi_events(block)
+            feature_range = np.linspace(1, num_features, num=num_features)
+            rfi_evs = [rfiEvent.RfiEvent(ev, labeled_array, non_zero_array)
+                       for ev in feature_range]
+            t_df = self.time[1] - self.time[0]
+            [ev.finetune_attr(self.file.header.foff,
+                              self.freqs,
+                              t_df, self.time) for ev in rfi_evs]
+            [ev.find_bands(int_dict) for ev in rfi_evs]
+            [ev.find_culprit(self.database.dictionary, int_dict) for ev in rfi_evs]
+            return rfi_evs
 
     def find_obs_event(self, start_time, duration, int_dict):
         """
@@ -553,9 +550,10 @@ class RfiObservation(object):
         :param duration: 
         :return: 
         """
-        block, num_sam = self.read_time_freq(start_time,
-                                             duration)
-        return self.block_events(block, int_dict)
+        if self._fil_file:
+            block, num_sam = self.read_time_freq(start_time,
+                                                 duration)
+            return self.block_events(block, int_dict)
 
     def obs_events(self, vec_length, int_dict):
         """
@@ -564,10 +562,61 @@ class RfiObservation(object):
         :param int_dict: 
         :return: 
         """
-        start_vector, duration = self.time_vector(vec_length)
-        self.events = [self.find_obs_event(start_vector[sv],
-                                           duration,
-                                           int_dict) for sv in range(vec_length)]
+        if self._fil_file:
+            start_vector, duration = self.time_vector(vec_length)
+            self.events = [self.find_obs_event(start_vector[sv],
+                                               duration,
+                                               int_dict) for sv in range(vec_length)]
+
+    def write2csv(self, csv_name='training_set.csv',
+                  h5_name='rfi_measurements.h5'):
+        """
+        
+        :param csv_name: 
+        :param h5_name: 
+        :return: 
+        """
+        # TODO get rid of for loops
+        columns = ('event',
+                   'c_freq',
+                   'bw',
+                   't_start',
+                   'duration',
+                   'culprit',
+                   'description',
+                   'band')
+        with pd.HDFStore(h5_name) as store:
+            for i, x in enumerate(self.events):
+                training_set = pd.DataFrame(columns=columns)
+                pd_idx = 0
+                for eb in x:
+                    if type(eb.culprit) is list:
+                        for b in range(len(eb.culprit)):
+                            training_set.loc[pd_idx] = [eb.event,
+                                                        eb.c_freq,
+                                                        eb.bw,
+                                                        eb.t_start,
+                                                        eb.duration,
+                                                        eb.culprit[b],
+                                                        eb.description[b],
+                                                        eb.band]
+                            pd_idx += 1
+
+                    else:
+                        training_set.loc[pd_idx] = [eb.event,
+                                                    eb.c_freq,
+                                                    eb.bw,
+                                                    eb.t_start,
+                                                    eb.duration,
+                                                    eb.culprit,
+                                                    eb.description,
+                                                    eb.band]
+                        pd_idx += 1
+                training_set.to_hdf(store,
+                                    'test',
+                                    append=True,
+                                    data_columns=columns)
+            store['test'].to_csv(csv_name)
 
         #
     # # from rfDB2
