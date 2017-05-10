@@ -10,6 +10,8 @@ import numpy as np
 from rfiUtils import detect_peaks
 from skimage import filters
 from statistics import median
+from rfipip import rfiDatabase, rfiUtils, rfiEvent
+import pandas as pd
 
 # Whole band
 # TODO add channel bw
@@ -25,6 +27,15 @@ rta_modes = {'1': {'n_chan': 32768,
              '4': {'n_chan': 32768,
                    'top_freq': 2699972534.18,
                    'base_freq': 1800000000.0}}
+
+training_set = pd.DataFrame(columns=('event',
+                                     'c_freq',
+                                     'bw',
+                                     't_start',
+                                     'duration',
+                                     'culprit',
+                                     'description',
+                                     'band'))
 
 
 class RfiObservation(object):
@@ -60,6 +71,11 @@ class RfiObservation(object):
         if self._fil_file:
             self.fs = None
             self.time_series = None
+
+        self.database = None
+        self.threshold = None
+        self.corrupted_samples = None
+        self.events = None
 
         # Initialise
         self._init()
@@ -224,54 +240,6 @@ class RfiObservation(object):
                                     start_time+duration,
                                     num=block.shape[1])
 
-    # from rfDB2
-    def get_rfi(self, data, sigma=4):
-        """
-        OBSOLETE
-        Get the rfi for the middle of the window
-        Data is assumed to be a 2D array (y-axis Time, x-axis Frequency)
-        and sigma is the standard deviation that is used
-        :param data: np.array
-        :param sigma:
-        :return:
-        """
-        mid = data.shape[0] // 2 + 1  # mid point of window
-        if data.ndim == 2:
-            med = np.median(data[:, :])
-        else:
-            med = np.median(data)
-        mad = np.median(np.abs(data - med), axis=0)
-        mad_limit = sigma / 1.4826  # see relation to standard deviation
-        mid_rfi = (data[mid] > mad_limit * mad + med) + \
-                  (data[mid] < -mad_limit * mad + med)
-        return mid_rfi, mad_limit
-
-    # from rfDB2
-    def median_filter(self,
-                      f_data,
-                      window=10,
-                      sigma=4):
-        """
-        OBSOLETE
-        :param f_data:
-        :param window:
-        :param sigma:
-        :return:
-        """
-        data = None
-        if self._rta_file:
-            data = np.transpose(f_data)
-        if self._fil_file:
-            data = f_data
-        rfi = np.zeros(data.shape)
-        for t in range(window, data.shape[0] - window):
-            rfi[t, :] = self.get_rfi(data[t - window:t + window + 1],
-                                     sigma=sigma)[0]
-        if self._rta_file:
-            return np.transpose(rfi)
-        if self._fil_file:
-            return rfi
-
     def time_vector(self, vec_length):
         """
         
@@ -313,9 +281,8 @@ class RfiObservation(object):
         """
         start_vector, duration = self.time_vector(vec_length)
         obs_val = [self.rfi_block(st, duration) for _, st in enumerate(start_vector)]
-        return median(obs_val)
-
-
+        self.threshold = median(obs_val)
+        # return median(obs_val)
 
     def sum_dimension(self,
                       data,
@@ -423,25 +390,6 @@ class RfiObservation(object):
         plt.colorbar()
         plt.show()
 
-    def find_rfi_events(self,
-                        mask_rfi,
-                        threshold=10,
-                        show=False):
-        """
-
-        :param mask_rfi:
-        :param threshold:
-        :param show:
-        :return:
-        """
-        mask_bp = 0
-        if self._rta_file:
-            mask_bp = self.sum_dimension(mask_rfi)
-        if self._fil_file:
-            mask_bp = self.sum_dimension(mask_rfi, axis=1)
-        rfi_events = detect_peaks(mask_bp, mph=threshold, show=show)
-        return rfi_events, rfi_events.shape[0]
-
     def read_time_freq(self,
                        start_time,
                        duration):
@@ -514,51 +462,140 @@ class RfiObservation(object):
             ax.set_aspect('auto')
             plt.show()
 
+    def read_database(self, path):
+        """
+        
+        :param path: 
+        :return: 
+        """
+        # TODO download from google docs
+        rfiDb = rfiDatabase.RfiDatabase()
+        rfiDb.write_dict([path])
+        # bands = rfiDb.dictionary.keys()
+        int_bands = [rfiDb.dictionary[k]['band'] for k in rfiDb.dictionary.keys()]
+        int_dict = dict(zip(int_bands, rfiDb.dictionary.keys()))
+        self.database = rfiDb
+        return int_dict
 
-# class RfiEvent(object):
-#     """
-#
-#     """
-#     def __init__(self,
-#                  mode=0,
-#                  peak_channel=None,
-#                  freq_vector=None,
-#                  arr_data=None):
-#
-#         self.time_occupancy = None
-#         self.peak_channel = peak_channel
-#         self.peak_freq = None
-#         self.bandwidth = None
-#         self.mode = mode  # not used atm
-#         self.data = None
-#
-#         self.init(freq_vector, arr_data)
-#
-#     def init(self, freq_vector, arr_data):
-#         """
-#
-#         :param freq_vector:
-#         :param arr_data:
-#         :return:
-#         """
-#         self.chan_to_freq(self.peak_channel, freq_vector)
-#         self.grab_data(arr_data)
-#
-#     # from rfDB2
-#     def chan_to_freq(self, chan, freq_vector):
-#         """
-#         Returns the channel number where a given frequency is to be found.
-#         Frequency is in Hz.
-#         :param freq_vector:
-#         :param chan:
-#         :return:
-#         """
-#         self.peak_freq = freq_vector[chan]
-#
-#     def grab_data(self, arr):
-#         """
-#
-#         :return:
-#         """
-#         num_samples = 50  # TODO hardcoded, choose 50 samples around event
-#         self.data = arr[:, self.peak_channel - num_samples: self.peak_channel + num_samples]
+    def _count_corrupted(self, close_img):
+        """
+        
+        :param corrupted_samples: 
+        :param close_img: 
+        :return: 
+        """
+        corrupt_block = np.count_nonzero(close_img == 1)
+        self.corrupted_samples += corrupt_block
+
+    def apply_threshold(self, block):
+        """
+        
+        :param block: 
+        :return: 
+        """
+        return block < self.threshold
+
+    def clean_mask(self, mask):
+        open_img = rfiUtils.open_blob(mask)
+        return rfiUtils.close_blob(open_img)
+
+    def mask_events(self, close_img):
+        """
+        
+        :param close_img: 
+        :return: 
+        """
+        labeled_array, num_features = measurements.label(close_img)
+        self._count_corrupted(close_img)
+        non_zero_array = labeled_array.nonzero()
+        return labeled_array, num_features, non_zero_array
+
+    def find_rfi_events(self, block):
+        """
+        
+        :param block: 
+        :return: 
+        """
+        mask = self.apply_threshold(block)
+        close_img = self.clean_mask(mask)
+        labeled_array, num_features, non_zero_array = self.mask_events(close_img)
+        return labeled_array, num_features, non_zero_array
+
+    def block_events(self, block, int_dict):
+        """
+        
+        :param block: 
+        :param int_dict: 
+        :return: 
+        """
+        labeled_array, num_features, non_zero_array = self.find_rfi_events(block)
+        feature_range = np.linspace(1, num_features, num=num_features)
+        rfi_evs = [rfiEvent.RfiEvent(ev, labeled_array, non_zero_array)
+                   for ev in feature_range]
+        t_df = self.time[1] - self.time[0]
+        [ev.finetune_attr(self.file.header.foff,
+                          self.freqs,
+                          t_df, self.time) for ev in rfi_evs]
+        [ev.find_bands(int_dict) for ev in rfi_evs]
+        [ev.find_culprit(rfiDb.dictionary, int_dict) for ev in rfi_evs]
+        return rfi_evs
+
+    def obs_events(self, start_time, duration):
+        """
+        
+        :param start_time: 
+        :param duration: 
+        :return: 
+        """
+        block, num_sam = fil_rfiObs.read_time_freq(start_time,
+                                                   duration)
+        self.events = [fil_rfiObs.block_events(block, int_dict)]
+
+    #
+    # # from rfDB2
+    # def get_rfi(self, data, sigma=4):
+    #     """
+    #     OBSOLETE
+    #     Get the rfi for the middle of the window
+    #     Data is assumed to be a 2D array (y-axis Time, x-axis Frequency)
+    #     and sigma is the standard deviation that is used
+    #     :param data: np.array
+    #     :param sigma:
+    #     :return:
+    #     """
+    #     mid = data.shape[0] // 2 + 1  # mid point of window
+    #     if data.ndim == 2:
+    #         med = np.median(data[:, :])
+    #     else:
+    #         med = np.median(data)
+    #     mad = np.median(np.abs(data - med), axis=0)
+    #     mad_limit = sigma / 1.4826  # see relation to standard deviation
+    #     mid_rfi = (data[mid] > mad_limit * mad + med) + \
+    #               (data[mid] < -mad_limit * mad + med)
+    #     return mid_rfi, mad_limit
+    #
+    # # from rfDB2
+    # def median_filter(self,
+    #                   f_data,
+    #                   window=10,
+    #                   sigma=4):
+    #     """
+    #     OBSOLETE
+    #     :param f_data:
+    #     :param window:
+    #     :param sigma:
+    #     :return:
+    #     """
+    #     data = None
+    #     if self._rta_file:
+    #         data = np.transpose(f_data)
+    #     if self._fil_file:
+    #         data = f_data
+    #     rfi = np.zeros(data.shape)
+    #     for t in range(window, data.shape[0] - window):
+    #         rfi[t, :] = self.get_rfi(data[t - window:t + window + 1],
+    #                                  sigma=sigma)[0]
+    #     if self._rta_file:
+    #         return np.transpose(rfi)
+    #     if self._fil_file:
+    #         return rfi
