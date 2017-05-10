@@ -12,6 +12,7 @@ from skimage import filters
 from statistics import median
 from rfipip import rfiDatabase, rfiUtils, rfiEvent
 import pandas as pd
+from scipy.ndimage import measurements
 
 # Whole band
 # TODO add channel bw
