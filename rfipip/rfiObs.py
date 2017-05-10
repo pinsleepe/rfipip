@@ -75,7 +75,7 @@ class RfiObservation(object):
 
         self.database = None
         self.threshold = None
-        self.corrupted_samples = None
+        self.corrupted_samples = 0
         self.events = None
 
         # Initialise
