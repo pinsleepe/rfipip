@@ -480,7 +480,7 @@ class RfiObservation(object):
     def _count_corrupted(self, close_img):
         """
         
-        :param corrupted_samples: 
+        :param corrupted_samples: fil_rfiObs
         :param close_img: 
         :return: 
         """
@@ -547,9 +547,9 @@ class RfiObservation(object):
         :param duration: 
         :return: 
         """
-        block, num_sam = fil_rfiObs.read_time_freq(start_time,
+        block, num_sam = self.read_time_freq(start_time,
                                                    duration)
-        self.events = [fil_rfiObs.block_events(block, int_dict)]
+        self.events = [self.block_events(block, int_dict)]
 
     #
     # # from rfDB2
