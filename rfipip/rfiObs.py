@@ -511,6 +511,18 @@ class RfiObservation(object):
             non_zero_array = labeled_array.nonzero()
             return labeled_array, num_features, non_zero_array
 
+    def percentage_rfi(self, vec_length):
+        """
+        
+        :param vec_length: 
+        :return: 
+        """
+        if self._fil_file:
+            _, duration = self.time_vector(vec_length)
+            num_sam = long(duration / self.file.header.tsamp)
+            file_sam = vec_length * num_sam * self.file.header.nchans
+            return rfiUtils.percentage(self.corrupted_samples, file_sam)
+
     def find_rfi_events(self, block):
         """
         

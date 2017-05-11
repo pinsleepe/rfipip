@@ -12,29 +12,30 @@ class RfiReport(object):
         if report_path:
             self.path = report_path
 
-    def plot_corrupted(self):
-        plt.rc('text', usetex=False)
-        plt.figure(figsize=(5, 5))
+    def plot_corrupted(self, rfi_sam):
+        f = plt.figure(figsize=(5, 5))
+        sp, ax = f.add_subplot(111)
         labels = 'Good', 'RFI'
         rfi_perc = rfi_sam * 100
         good_perc = 100 - rfi_perc
         sizes = [good_perc, rfi_perc]
-        explode = (0, 0.1)
 
-        fig1, ax1 = plt.subplots()
-        ax1.pie(sizes,
-                labels=labels,
-                autopct='%1.1f%%',
-                shadow=True,
-                startangle=90)
-        ax1.axis('equal')
-        plt.title('Cleanliness of the observation')
-        pdf.savefig()  # saves the current figure into a pdf page
-        plt.close()
+        ax.pie(sizes,
+               labels=labels,
+               autopct='%1.1f%%',
+               shadow=True,
+               startangle=90)
+        ax.axis('equal')
+        sp.title('Cleanliness of the observation')
+        # pdf.savefig()  # saves the current figure into a pdf page
+        # sp.close()
+        return f
 
     def write_report(self, training_set):
         with PdfPages('rfi_report.pdf') as pdf:
-            # self.plot_corrupted()
+            f = self.plot_corrupted()
+            pdf.savefig()
+            f.close()
 
             plt.rc('text', usetex=False)
             plt.figure(figsize=(5, 5))
