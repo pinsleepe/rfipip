@@ -13,47 +13,44 @@ class RfiReport(object):
             self.path = report_path
 
     def plot_corrupted(self, rfi_sam):
-        f = plt.figure(figsize=(5, 5))
-        sp, ax = f.add_subplot(111)
         labels = 'Good', 'RFI'
         rfi_perc = rfi_sam * 100
         good_perc = 100 - rfi_perc
         sizes = [good_perc, rfi_perc]
 
+        fig, ax = plt.subplots(figsize=(5, 5))
         ax.pie(sizes,
                labels=labels,
                autopct='%1.1f%%',
                shadow=True,
                startangle=90)
         ax.axis('equal')
-        sp.title('Cleanliness of the observation')
-        # pdf.savefig()  # saves the current figure into a pdf page
-        # sp.close()
-        return f
+        plt.title('Cleanliness of the observation')
+        return fig, ax
 
-    def write_report(self, training_set):
+    def write_report(self, training_set, rfi_sam):
         with PdfPages('rfi_report.pdf') as pdf:
-            f = self.plot_corrupted()
+            f, _ = self.plot_corrupted(rfi_sam)
             pdf.savefig()
             f.close()
-
-            plt.rc('text', usetex=False)
-            plt.figure(figsize=(5, 5))
-            labels = 'Good', 'RFI'
-            rfi_perc = rfi_sam * 100
-            good_perc = 100 - rfi_perc
-            sizes = [good_perc, rfi_perc]
-
-            fig1, ax1 = plt.subplots()
-            ax1.pie(sizes,
-                    labels=labels,
-                    autopct='%1.1f%%',
-                    shadow=True,
-                    startangle=90)
-            ax1.axis('equal')
-            plt.title('Cleanliness of the observation')
-            pdf.savefig()  # saves the current figure into a pdf page
-            plt.close()
+            #
+            # plt.rc('text', usetex=False)
+            # plt.figure(figsize=(5, 5))
+            # labels = 'Good', 'RFI'
+            # rfi_perc = rfi_sam * 100
+            # good_perc = 100 - rfi_perc
+            # sizes = [good_perc, rfi_perc]
+            #
+            # fig1, ax1 = plt.subplots()
+            # ax1.pie(sizes,
+            #         labels=labels,
+            #         autopct='%1.1f%%',
+            #         shadow=True,
+            #         startangle=90)
+            # ax1.axis('equal')
+            # plt.title('Cleanliness of the observation')
+            # pdf.savefig()  # saves the current figure into a pdf page
+            # plt.close()
 
             plt.rc('text', usetex=False)
             plt.figure(figsize=(5, 5))
