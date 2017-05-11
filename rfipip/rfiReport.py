@@ -73,30 +73,27 @@ class RfiReport(object):
         plt.title('Known culprit time occupancy')
         return fig, ax
 
-    def write_report(self, training_set, rfi_sam):
+    def write_report(self, training_set,
+                     rfi_sam):
         """
         
         :param training_set: 
         :param rfi_sam: 
         :return: 
         """
-        with PdfPages('rfi_report.pdf') as pdf:
+        with PdfPages(self.name) as pdf:
 
             f, _ = self.plot_corrupted(rfi_sam)
             pdf.savefig()
-            f.close()
 
             f, _ = self.plot_culprit_classyfication(training_set)
             pdf.savefig()
-            f.close()
 
             f, _ = self.plot_culprit_occurences(training_set)
             pdf.savefig()
-            f.close()
 
             f, _ = self.plot_culprit_time_occupancy(training_set)
             pdf.savefig()
-            f.close()
 
             # We can also set the file's metadata via the PdfPages object:
             d = pdf.infodict()
