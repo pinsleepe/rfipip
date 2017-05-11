@@ -599,6 +599,8 @@ class RfiObservation(object):
                    'culprit',
                    'description',
                    'band')
+        # check if h5 file exist
+        # TODO if exist, stop, delete or change name
         with pd.HDFStore(h5_name) as store:
             for i, x in enumerate(self.events):
                 training_set = pd.DataFrame(columns=columns)
