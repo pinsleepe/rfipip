@@ -581,7 +581,8 @@ class RfiObservation(object):
                                                int_dict) for sv in range(vec_length)]
 
     def write2csv(self, csv_name='training_set.csv',
-                  h5_name='rfi_measurements.h5'):
+                  h5_name='rfi_measurements.h5',
+                  return_h5=False):
         """
         
         :param csv_name: 
@@ -630,6 +631,8 @@ class RfiObservation(object):
                                     append=True,
                                     data_columns=columns)
             store['test'].to_csv(csv_name)
+            if return_h5:
+                return store['test']
 
         #
     # # from rfDB2
