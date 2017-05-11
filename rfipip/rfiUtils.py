@@ -219,3 +219,12 @@ def close_blob(data, close=None):
     close_img = ndimage.binary_closing(data, structure=cl_struck)
     return np.invert(close_img)
 
+
+def percentage(part, whole):
+    """
+    
+    :param part: 
+    :param whole: 
+    :return: 
+    """
+    return 100 * float(part)/float(whole)

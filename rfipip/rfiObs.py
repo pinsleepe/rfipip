@@ -511,6 +511,18 @@ class RfiObservation(object):
             non_zero_array = labeled_array.nonzero()
             return labeled_array, num_features, non_zero_array
 
+    def percentage_rfi(self, vec_length):
+        """
+        
+        :param vec_length: 
+        :return: 
+        """
+        if self._fil_file:
+            _, duration = self.time_vector(vec_length)
+            num_sam = long(duration / self.file.header.tsamp)
+            file_sam = vec_length * num_sam * self.file.header.nchans
+            return rfiUtils.percentage(self.corrupted_samples, file_sam)
+
     def find_rfi_events(self, block):
         """
         
@@ -569,7 +581,8 @@ class RfiObservation(object):
                                                int_dict) for sv in range(vec_length)]
 
     def write2csv(self, csv_name='training_set.csv',
-                  h5_name='rfi_measurements.h5'):
+                  h5_name='rfi_measurements.h5',
+                  return_h5=False):
         """
         
         :param csv_name: 
@@ -586,6 +599,8 @@ class RfiObservation(object):
                    'culprit',
                    'description',
                    'band')
+        # check if h5 file exist
+        # TODO if exist, stop, delete or change name
         with pd.HDFStore(h5_name) as store:
             for i, x in enumerate(self.events):
                 training_set = pd.DataFrame(columns=columns)
@@ -618,6 +633,8 @@ class RfiObservation(object):
                                     append=True,
                                     data_columns=columns)
             store['test'].to_csv(csv_name)
+            if return_h5:
+                return store['test']
 
         #
     # # from rfDB2
