@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from rfiUtils import detect_peaks
 from skimage import filters
-from statistics import median
 from rfipip import rfiDatabase, rfiUtils, rfiEvent
 import pandas as pd
 from scipy.ndimage import measurements
@@ -276,7 +275,8 @@ class RfiObservation(object):
         if self._fil_file:
             start_vector, duration = self.time_vector(vec_length)
             obs_val = [self.rfi_block(st, duration) for _, st in enumerate(start_vector)]
-            self.threshold = median(obs_val)
+            obs_val2array = np.array(obs_val)
+            self.threshold = np.median(obs_val2array)
 
     def sum_dimension(self,
                       data,
