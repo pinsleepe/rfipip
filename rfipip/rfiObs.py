@@ -599,8 +599,8 @@ class RfiObservation(object):
         :return: 
         """
         csv_name = self.file.header.source_name + '_' + \
-                   self.file.header.src_dej + '_' + \
-                   self.file.header.src_raj + '.csv'
+                   str(self.file.header.src_dej) + '_' + \
+                   str(self.file.header.src_raj) + '.csv'
         # TODO get rid of for loops
         # TODO reset idx in csv file
         columns = ('event',
