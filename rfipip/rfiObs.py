@@ -589,15 +589,18 @@ class RfiObservation(object):
                                                duration,
                                                int_dict) for sv in range(vec_length)]
 
-    def write2csv(self, csv_name='training_set.csv',
+    def write2csv(self,
                   h5_name='rfi_measurements.h5',
                   return_h5=False):
         """
         
-        :param csv_name: 
         :param h5_name: 
+        :param return_h5: 
         :return: 
         """
+        csv_name = self.file.header.source_name + '_' + \
+                   self.file.header.src_dej + '_' + \
+                   self.file.header.src_raj + '.csv'
         # TODO get rid of for loops
         # TODO reset idx in csv file
         columns = ('event',
@@ -637,10 +640,13 @@ class RfiObservation(object):
                                                     eb.description,
                                                     eb.band]
                         pd_idx += 1
-                training_set.to_hdf(store,
-                                    'test',
-                                    append=True,
-                                    data_columns=columns)
+                store.put('test',
+                          training_set,
+                          format='table',
+                          data_columns=True,
+                          append=True,
+                          min_itemsize={'band': 150,
+                                        'description': 500})
             store['test'].to_csv(csv_name)
             if return_h5:
                 return store['test']
