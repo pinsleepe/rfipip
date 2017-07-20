@@ -111,5 +111,5 @@ class RfiReport(object):
 
             # We can also set the file's metadata via the PdfPages object:
             d = pdf.infodict()
-            d['Title'] = 'RFI Report'
+            d['Title'] = 'RFI Report ' + self.name
             d['ModDate'] = datetime.datetime.today()
