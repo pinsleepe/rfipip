@@ -40,18 +40,17 @@ rta_modes = {'1': {'n_chan': 32768,
 
 class RfiObservation(object):
     def __init__(self,
-                 path='',
                  h5_file=False,
                  fil_file=False,
                  rta_file=False):
         """
-
-        :param path:
-        :param h5_file:
-        :param fil_file:
-        :param rta_file:
+        
+        :param path: 
+        :param h5_file: H5 observation file
+        :param fil_file: filterbank observation file
+        :param rta_file: RTA system observation file
+        :param h5_pol_files: path to the polarisation files
         """
-        self.path = path
 
         self._h5_file = h5_file
         self._fil_file = fil_file
@@ -95,12 +94,17 @@ class RfiObservation(object):
         :return:
         """
         if self._h5_file:
-            import h5py
-            self.file = h5py.File(self.path, mode='r+')
+            from rfipip import rfiH5
+            try:
+                len(self.path) == 2
+            except ValueError:
+                print('Something is wrong with the polarisation files path!')
+            else:
+                self.file = rfiH5.RfiH5(self.path[0], self.path[1])
 
     def _open_rta_file(self):
         """
-        Open ratty h5 file
+        Open RTA h5 file
         :return:
         """
         if self._rta_file:
@@ -159,7 +163,7 @@ class RfiObservation(object):
         if self._rta_file:
             self._open_rta_file()
 
-    def read_file(self, start_time=0, duration=0):
+    def read_file(self, start_time=0.0, duration=0.0, polarisation=0):
         """
 
         :param start_time: in seconds
@@ -168,11 +172,11 @@ class RfiObservation(object):
         """
         if self.file:
             if self._fil_file:
-                start_sample = long(start_time / self.file.header.tsamp)
+                start_sample = start_time / self.file.header.tsamp
                 if duration == 0:
                     nsamples = self.file.header.nsamples - start_sample
                 else:
-                    nsamples = long(duration / self.file.header.tsamp)
+                    nsamples = duration / self.file.header.tsamp
                 block = self.file.readBlock(start_sample, nsamples)
                 self._create_time(start_time, duration, block)
                 return block, nsamples
@@ -188,6 +192,12 @@ class RfiObservation(object):
                 # assuming that mode doesnt change in observation
                 self.mode = self.file['mode'][:][self.time][0]
                 self._create_freqs()
+            if self._h5_file:
+                start_sample = start_time / self.file.sampling_time
+                if duration == 0:
+                    nsamples = self.file.header.nsamples - start_sample
+                else:
+                    nsamples = duration / self.file.header.tsamp
 
     def _create_freqs(self):
         """
