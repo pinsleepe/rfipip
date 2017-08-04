@@ -15,6 +15,9 @@
 from __future__ import division, print_function
 import numpy as np
 from scipy import ndimage
+from ConfigParser import SafeConfigParser
+import os
+from skimage import filters
 
 
 def replaceChar(text):
@@ -76,3 +79,41 @@ def percentage(part, whole):
     :return: 
     """
     return 100 * float(part)/float(whole)
+
+
+def parse_frank_ini_file(ini_file='', required_sections=None):
+    """
+    (Modified parse_ini_file)
+    Parse an ini file into a dictionary. No checking done at all.
+    :param ini_file
+    :param required_sections
+    :return: a dictionary containing the configuration
+    """
+    if (ini_file == '') and ('FRANKENINI' in os.environ.keys()):
+        ini_file = os.environ['FRANKENINI']
+    if required_sections is None:
+        required_sections = []
+    parser = SafeConfigParser()
+    files = parser.read(ini_file)
+    if len(files) == 0:
+        raise IOError('Could not read the config file, %s' % ini_file)
+    for check_section in required_sections:
+        if not parser.has_section(check_section):
+            raise ValueError(
+                'The config file does not seem to have the required %s section?' % (
+                    check_section,))
+    config = {}
+    for section in parser.sections():
+        config[section] = {}
+        for items in parser.items(section):
+            config[section][items[0]] = items[1]
+    return config
+
+
+def rfi_threshold(data_array):
+    """
+    Calculate threshold based on Yen algorithm
+    :param data_array: numpy array
+    :return: 
+    """
+    return filters.threshold_yen(data_array)

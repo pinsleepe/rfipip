@@ -30,17 +30,17 @@ class RfiH5(object):
         Init BF observation
         :return: 
         """
-        self.open_file(self.path)
+        self.open_file()
         self.fill_metadata()
         # do stuff
         self.file.close()
 
-    def open_file(self, filename):
+    def open_file(self):
         """
         Loading the files.
         :return:
         """
-        self.file = h5py.File(filename, 'r')
+        self.file = h5py.File(self.path, 'r')
 
     def fill_metadata(self):
         """
@@ -139,6 +139,14 @@ class RfiH5(object):
             ra, dec = self.observer.radec_of(np.radians(self.metadata[ant]['az']), np.radians(self.metadata[ant]['el']))
             self.metadata[ant]['ra'] = str(ra)
             self.metadata[ant]['dec'] = str(dec)
+
+    def read_chunk(self):
+        if self.file.closed:
+            self.open_file()
+        else:
+            print('')
+            # do stuff
+        self.file.close()
 
     #     """
     #     Getting number of channels from each file.
