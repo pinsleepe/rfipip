@@ -84,7 +84,7 @@ class RfiReport(object):
         training_set.loc[lambda df: df.culprit > 0, :].groupby('description')['duration'].sum().plot.pie(
             autopct='%1.1f%%')
         plt.ylabel('')
-        plt.title('Known culprit time occupancy')
+        plt.title('Known culprit time_vector occupancy')
         return fig, ax
 
     def write_report(self, training_set,

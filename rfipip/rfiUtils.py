@@ -117,3 +117,51 @@ def rfi_threshold(data_array):
     :return: 
     """
     return filters.threshold_yen(data_array)
+
+
+def _to_stokesI(x, y, decimation_factor, out):
+    for i in range(out.shape[1]):
+        for j in range(out.shape[0]):
+            s = numpy.float32(0)
+            for k in range(j * decimation_factor, (j + 1) * decimation_factor):
+                x_r = numpy.float32(x[i, k, 0])
+                x_i = numpy.float32(x[i, k, 1])
+                y_r = numpy.float32(y[i, k, 0])
+                y_i = numpy.float32(y[i, k, 1])
+                s += x_r * x_r + x_i * x_i + y_r * y_r + y_i * y_i
+            out[j, i] = s / decimation_factor
+
+
+def to_stokesI(x, y, decimation_factor):
+    out = numpy.zeros((x.shape[1] // decimation_factor, x.shape[0]), numpy.float32)
+    _to_stokesI(x, y, decimation_factor, out)
+    return out
+
+
+def _to_stokes(x, y, out, fullstokes=False):
+    for i in range(x.shape[0]):
+        for j in range(x.shape[1]):
+            x_r = numpy.float32(x[i, j, 0])
+            x_i = numpy.float32(x[i, j, 1])
+            y_r = numpy.float32(y[i, j, 0])
+            y_i = numpy.float32(y[i, j, 1])
+            xx = x_r * x_r + x_i * x_i
+            yy = y_r * y_r + y_i * y_i
+            xy_r = x_r * y_r + x_i * y_i
+            xy_i = x_i * y_r - x_r * y_i
+            if fullstokes:
+                out[i, 0, j] = xx + yy
+                out[i, 1, j] = xx - yy
+                out[i, 2, j] = 2 * xy_r
+                out[i, 3, j] = 2 * xy_i
+            else:
+                out[i, 0, j] = xx
+                out[i, 1, j] = yy
+                out[i, 2, j] = xy_r
+                out[i, 3, j] = xy_i
+
+
+def to_stokes(x, y, fullstokes=False):
+    out = numpy.empty((x.shape[0], 4, x.shape[1]), numpy.float32)
+    _to_stokes(x, y, out, fullstokes=fullstokes)
+    return out

@@ -82,9 +82,9 @@ class RfiEvent(object):
         """
         
         :param foff: header.foff
-        :param freqs: fil_rfiObs.freqs
-        :param t_df: fil_rfiObs.time[1] - fil_rfiObs.time[0]
-        :param time_v: fil_rfiObs.time
+        :param freqs_vector: fil_rfiObs.freqs_vector
+        :param t_df: fil_rfiObs.time_vector[1] - fil_rfiObs.time_vector[0]
+        :param time_v: fil_rfiObs.time_vector
         :return: 
         """
         # check if the event occupies more than one channel

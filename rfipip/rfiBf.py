@@ -113,7 +113,7 @@ class RfiBf(object):
 
     def sync_time(self):
         """
-        find UTC sync time for data files
+        find UTC sync time_vector for data files
         :return: 
         """
         if self.beamformer['pol_0']['metadata']['clk_sync'] \

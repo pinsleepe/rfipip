@@ -74,7 +74,7 @@ class RfiH5(object):
         nts_adc_snapblock = np.diff(self.clockcounts)[0]  # all should be 8192
         self.metadata['nsamples'] = nts_adc_snapblock
         if self.verbose:
-            print('Nr time samples per ADC snap block = %d' % nts_adc_snapblock)
+            print('Nr time_vector samples per ADC snap block = %d' % nts_adc_snapblock)
         if (np.where(np.diff(self.clockcounts) != nts_adc_snapblock)[0].size) > 0:
             print('Missing spectra in: %s' % self.path)
             print(np.where(np.diff(self.clockcounts) != nts_adc_snapblock)[0])
@@ -144,8 +144,15 @@ class RfiH5(object):
         if self.file.closed:
             self.open_file()
         else:
-            print('')
-            # do stuff
+            # select a chunk size (according to memory constraints)
+            ts_step = cnt * chunk_size
+            # divide the data in chunks of this size (either by
+            # creating several files, or by loading only one chunk at a time)
+            a = start_sync_ts_polA + ts_step
+            b = start_sync_ts_polA + ts_step + chunk_size
+            spectra_chunk_polA = self.file['Data/bf_raw'][:, a:b, :]
+            if self.debug:
+                print('Reading A pol took %.3f secs' % (time.time() - etime))
         self.file.close()
 
     #     """
@@ -235,8 +242,8 @@ class RfiH5(object):
     #
     # def find_sync_time(self):
     #     """
-    #     Find sync time in the data files.
-    #     :return: unix time in seconds
+    #     Find sync time_vector in the data files.
+    #     :return: unix time_vector in seconds
     #     """
     #     try:
     #         syncTime = self.p0_data["/TelescopeModel/cbf"].attrs['sync_time']
@@ -244,26 +251,26 @@ class RfiH5(object):
     #         syncFactor = self.p0_data["/TelescopeModel/cbf"].attrs['scale_factor_timestamp']
     #         self.sync_time_factor = syncFactor
     #     except KeyError:
-    #         print "Data does not have sync time in the header! " \
+    #         print "Data does not have sync time_vector in the header! " \
     #               "Specify it manually in the script!"
     #
     # def find_obs_start_time(self):
     #     """
-    #     Calculate observation start time,
-    #     :return: observation start time in seconds
+    #     Calculate observation start time_vector,
+    #     :return: observation start time_vector in seconds
     #     """
     #     self.obs_start_time = self.p0_adc_count[self.p0_adc_idx[0]] / self.sync_time_factor
     #
     # def find_unix_time(self):
     #     """
-    #     Convert observation start time to unix time
+    #     Convert observation start time_vector to unix time_vector
     #     :return:
     #     """
     #     self.unix_time = float(self.sync_time) + self.obs_start_time
     #
     # def unix2mjd(self):
     #     """
-    #     Convert unix time to MJD
+    #     Convert unix time_vector to MJD
     #     :return:
     #     """
     #     startTimeMJD = katpoint.Timestamp(self.unix_time)
