@@ -37,7 +37,7 @@ class RfiH5(object):
 
     def open_file(self):
         """
-        Loading the files.
+        Loading the files. Remember to close the file!!
         :return:
         """
         self.file = h5py.File(self.path, 'r')
@@ -140,20 +140,23 @@ class RfiH5(object):
             self.metadata[ant]['ra'] = str(ra)
             self.metadata[ant]['dec'] = str(dec)
 
-    def read_chunk(self):
-        if self.file.closed:
-            self.open_file()
-        else:
-            # select a chunk size (according to memory constraints)
-            ts_step = cnt * chunk_size
-            # divide the data in chunks of this size (either by
-            # creating several files, or by loading only one chunk at a time)
-            a = start_sync_ts_polA + ts_step
-            b = start_sync_ts_polA + ts_step + chunk_size
-            spectra_chunk_polA = self.file['Data/bf_raw'][:, a:b, :]
-            if self.debug:
-                print('Reading A pol took %.3f secs' % (time.time() - etime))
-        self.file.close()
+    def read_chunk(self, cnt, chunk_size, start_sync_pol):
+        """
+        Numpy works by loading all the data into the memory,
+        so won't be able to load naively the data.
+        Divide the problem into chunks, and use a map/reduce approach
+        :param cnt:
+        :param chunk_size: select a chunk size (according to memory constraints)
+        :param start_sync_pol: where both pols start overlapping
+        :return:
+        """
+        # if not self.file.isopen:
+        #     self.open_file()
+        ts_step = cnt * chunk_size
+        start_chunk = start_sync_pol + ts_step
+        end_chunk = start_sync_pol + ts_step + chunk_size
+        spectra_chunk_pol = self.file['Data/bf_raw'][:, start_chunk:end_chunk, :]
+        return spectra_chunk_pol
 
     #     """
     #     Getting number of channels from each file.

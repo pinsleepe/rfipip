@@ -14,13 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import matplotlib.cm as cm
-import matplotlib.pyplot as plt
+# import matplotlib.cm as cm
+# import matplotlib.pyplot as plt
 import numpy as np
-from rfipip import rfiDatabase, rfiUtils, rfiEvent, rfiH5
-import pandas as pd
-from scipy.ndimage import measurements
+from rfipip import rfiH5, rfiUtils
+# import pandas as pd
+# from scipy.ndimage import measurements
 import ephem
+import time
+from datetime import datetime
+import sys
+python_version = sys.version_info.major
 
 
 class RfiObservation(object):
@@ -28,15 +32,19 @@ class RfiObservation(object):
                  path,
                  h5_file=False,
                  fil_file=False,
-                 rta_file=False):
+                 rta_file=False,
+                 verbose=False,
+                 debug=False):
         """
         
-        :param path: 
+        :param path: for H5 file this is a list!
         :param h5_file: H5 observation file
         :param fil_file: filterbank observation file
         :param rta_file: RTA system observation file
         """
         self.path = path
+        self.verbose = verbose
+        self.debug = debug
         self._h5_file = h5_file
 
         if h5_file:
@@ -73,19 +81,23 @@ class RfiObservation(object):
 
     def _init(self):
         """
-        Initialise the rfi observation i.e. open and read the data
+        Initialise the rfi observation and fill the metadata
         :return:
         """
-        self._open_file()
+        if self._h5_file:
+            self.create_bf()
+            self.fill_metadata()
+        else:
+            self._open_file()
 
     def _open_file(self):
         """
         Open file according to type
         :return:
         """
-        if self._h5_file:
-            from rfiH5 import RfiH5
-            self.file = RfiH5(self.path, self.observer)
+        # if self._h5_file:
+        #     from rfiH5 import RfiH5
+        #     self.file = RfiH5(self.path, self.observer)
         if self._fil_file:
             from rfiFil import RfiFil
             self.file = RfiFil(self.path, self.observer)
@@ -101,10 +113,12 @@ class RfiObservation(object):
             h5_obj.init()
 
             key = 'pol_%d' % idx
-            print('Reading file %s into %s' % (filename, key))
+            if self.verbose:
+                print('Reading file %s into %s' % (filename, key))
             self.beamformer[key] = {
-                                    'h5file': filename,
-                                    'metadata': h5_obj.metadata
+                                    'h5filename': filename,
+                                    'metadata': h5_obj.metadata,
+                                    'adc_clks': h5_obj.clockcounts
                                     }
 
     def verify_h5(self):
@@ -139,9 +153,9 @@ class RfiObservation(object):
                                (self.beamformer['pol_0']['metadata']['nchannels'],
                                 self.beamformer['pol_1']['metadata']['nchannels']))
         self.beamformer['metadata'] = {'ants': ants,
-                                       'source_name': source_name,
-                                       'ra': right_ascension,
-                                       'dec': declination,
+                                       'target': {'source_name': source_name,
+                                                  'ra': right_ascension,
+                                                  'dec': declination},
                                        'sample_rate': sample_rate}
 
     def find_utc(self):
@@ -153,7 +167,7 @@ class RfiObservation(object):
                 self.beamformer['pol_1']['metadata']['clk_sync']:
             print('System sync timestamp differ between the polarizations.')
             raise RuntimeError()
-        sync_ts = beamformer['pol_0']['metadata']['clk_sync']
+        sync_ts = self.beamformer['pol_0']['metadata']['clk_sync']
         if self.verbose:
             print('syncTime: %d' % sync_ts)
 
@@ -161,8 +175,8 @@ class RfiObservation(object):
                 self.beamformer['pol_1']['metadata']['nsamples']:
             print('Number of channels differs between the polarizations.')
             raise RuntimeError('channelNumberPol0 %d != channelNumberPol1 %d' %
-                               (beamformer['pol_0']['metadata']['nsamples'],
-                                beamformer['pol_1']['metadata']['nsamples']))
+                               (self.beamformer['pol_0']['metadata']['nsamples'],
+                                self.beamformer['pol_1']['metadata']['nsamples']))
         nsamples = self.beamformer['pol_0']['metadata']['nsamples']
         if self.verbose:
             print('ADCsnapblock: %d' % nsamples)
@@ -180,10 +194,10 @@ class RfiObservation(object):
         calculating where both files start overlapping
         :return:
         """
-        start_sync_ts = numpy.max([self.beamformer['pol_0']['adc_clks'][0],
+        start_sync_ts = np.max([self.beamformer['pol_0']['adc_clks'][0],
                                    self.beamformer['pol_1']['adc_clks'][0]])
-        start_sync_ts_pol_a = numpy.where(self.beamformer['pol_0']['adc_clks'] == start_sync_ts)[0][0]
-        start_sync_ts_pol_b = numpy.where(self.beamformer['pol_1']['adc_clks'] == start_sync_ts)[0][0]
+        start_sync_ts_pol_a = np.where(self.beamformer['pol_0']['adc_clks'] == start_sync_ts)[0][0]
+        start_sync_ts_pol_b = np.where(self.beamformer['pol_1']['adc_clks'] == start_sync_ts)[0][0]
         if self.verbose:
             print('countADCPol0[0]: %d' % self.beamformer['pol_0']['adc_clks'][0])
             print('countADCPol1[0]: %d' % self.beamformer['pol_1']['adc_clks'][0])
@@ -197,20 +211,20 @@ class RfiObservation(object):
             print('countADCPol1[%d]: %d' % (start_sync_ts_pol_b,
                                             self.beamformer['pol_1']['adc_clks'][start_sync_ts_pol_b]))
             print('startSyncADC: %d' % start_sync_ts)
-        return {'start_sync': start_sync_ts,
-                'start_sync_pol_a': start_sync_ts_pol_a,
-                'start_sync_pol_b': start_sync_ts_pol_b}
+        return {'sync': start_sync_ts,
+                'pol_0': start_sync_ts_pol_a,
+                'pol_1': start_sync_ts_pol_b}
 
     def overlap_end(self):
         """
         calculating where both files end overlaping
         :return:
         """
-        end_sync_ts = numpy.min([self.beamformer['pol_0']['adc_clks'][-1],
-                                 self.beamformer['pol_1']['adc_clks'][-1]])
-        end_sync_ts_pol_a = numpy.where(self.beamformer['pol_0']['adc_clks'] == end_sync_ts)[0][0]
-        end_sync_ts_pol_b = numpy.where(self.beamformer['pol_1']['adc_clks'] == end_sync_ts)[0][0]
-        if verbose:
+        end_sync_ts = np.min([self.beamformer['pol_0']['adc_clks'][-1],
+                              self.beamformer['pol_1']['adc_clks'][-1]])
+        end_sync_ts_pol_a = np.where(self.beamformer['pol_0']['adc_clks'] == end_sync_ts)[0][0]
+        end_sync_ts_pol_b = np.where(self.beamformer['pol_1']['adc_clks'] == end_sync_ts)[0][0]
+        if self.verbose:
             print('countADCPol0[-1]: %d' % self.beamformer['pol_0']['adc_clks'][-1])
             print('countADCPol1[-1]: %d' % self.beamformer['pol_1']['adc_clks'][-1])
             print('Sync to end timestamp: %d' % end_sync_ts)
@@ -225,17 +239,158 @@ class RfiObservation(object):
             print('countADCPol1[%d]: %d' % (end_sync_ts_pol_b,
                                             self.beamformer['pol_1']['adc_clks'][end_sync_ts_pol_b]))
             print('endSyncADC: %d' % end_sync_ts)
-        return {'end_sync': end_sync_ts,
-                'end_sync_pol_a': end_sync_ts_pol_a,
-                'end_sync_pol_b': end_sync_ts_pol_b}
+        return {'sync': end_sync_ts,
+                'pol_0': end_sync_ts_pol_a,
+                'pol_1': end_sync_ts_pol_b}
 
     def sync_h5(self):
         """
-
+        Where both files start/end overlapping
         :return:
         """
-        self.beamformer['metadata']['syncADC']['start'] = self.overlap_start()
-        self.beamformer['metadata']['syncADC']['end'] = self.overlap_end()
+        self.beamformer['metadata']['syncADC'] = {'start': self.overlap_start(),
+                                                  'end': self.overlap_end()}
+        nts_pol_a = self.beamformer['metadata']['syncADC']['end']['pol_0'] - \
+                    self.beamformer['metadata']['syncADC']['start']['pol_0']
+        nts_pol_b = self.beamformer['metadata']['syncADC']['end']['pol_1'] - \
+                    self.beamformer['metadata']['syncADC']['start']['pol_1']
+        self.beamformer['metadata']['syncADC']['difference'] = {'pol_0': nts_pol_a,
+                                                                'pol_1': nts_pol_b}
+        if np.abs(nts_pol_a - nts_pol_b) > 0:
+            raise RuntimeError('Different number timestamps between polarisation, '
+                               'build in procedures to handle spectra loss')
+
+    def obs_metadata(self):
+        """
+        observation metadata -- sampling times,
+        start MJD times, frequencies etc.
+        :return:
+        """
+        start_ts = self.beamformer['metadata']['syncADC']['start']['sync'] / self.beamformer['metadata']['sample_rate']
+        unix_start_ts = float(self.beamformer['metadata']['syncTime']) + start_ts
+        unix_dt = datetime.utcfromtimestamp(unix_start_ts).strftime('%Y-%m-%d %H:%M:%S.%f')
+        start_mjd = ephem.julian_date(ephem.Date(unix_dt)) - 2400000.5  # convert to MJD
+        cen_freq = self.beamformer['pol_0']['metadata']['cenfreq']
+        bandwidth = self.beamformer['pol_0']['metadata']['bandwidth']
+        channel_bw = bandwidth / self.beamformer['pol_0']['metadata']['nchannels']
+        if self.verbose:
+            print('obsStartTime: %.12f' % start_ts)
+            print('obsSyncDate: %s' % unix_dt)
+            print('startTimeMJD: %.12f' % start_mjd)
+            print('freqCent: %f' % cen_freq)
+            print('channelBW: %.10f MHz' % (channel_bw * 1e-6))
+
+        # upper_freq = cen_freq + bandwidth/2. - channel_bw/2.
+        upper_freq = cen_freq + bandwidth / 2.
+        # lower_freq = cen_freq - bandwidth/2.+ channel_bw/2.
+        lower_freq = cen_freq - bandwidth / 2.
+        # Getting number of spectra from each file.
+        nspectra_pol_a = self.beamformer['pol_0']['metadata']['nspectra']
+        nspectra_pol_b = self.beamformer['pol_1']['metadata']['nspectra']
+        if self.verbose:
+            print('freqTop: %.10f MHz' % (upper_freq * 1e-6))
+            print('freqBottom: %.10f MHz' % (lower_freq * 1e-6))
+            print('spectraNumberPol0: %d' % nspectra_pol_a)
+            print('spectraNumberPol1: %d' % nspectra_pol_b)
+
+        self.beamformer['metadata']['obsStartTime'] = start_ts
+        self.beamformer['metadata']['obsSyncDate'] = unix_dt
+        self.beamformer['metadata']['startTimeMJD'] = start_mjd
+        self.beamformer['metadata']['freqCent'] = cen_freq
+        self.beamformer['metadata']['channelBW'] = channel_bw
+        self.beamformer['metadata']['freqTop'] = upper_freq
+        self.beamformer['metadata']['freqBottom'] = lower_freq
+        self.beamformer['metadata']['spectraNumberPol0'] = nspectra_pol_a
+        self.beamformer['metadata']['spectraNumberPol1'] = nspectra_pol_b
+
+    def fill_metadata(self):
+        """
+        Fill the metadata with info from H5
+        :return:
+        """
+        self.verify_h5()
+        self.find_utc()
+        self.overlap_start()
+        self.overlap_end()
+        self.sync_h5()
+        self.obs_metadata()
+
+    def bf_file_object(self, keys):
+        """
+        Add file object to beamformer dict
+        :param keys:
+        :return:
+        """
+        for key in keys:
+            h5_pol = rfiH5.RfiH5(self.beamformer[key]['h5filename'], self.observer)
+            h5_pol.open_file()
+            self.beamformer[key]['file'] = h5_pol
+
+    def read_chunks(self, chunk_size):
+        """
+        Numpy works by loading all the data into the memory,
+        so won't be able to load naively the data.
+        Divide the problem into chunks, and use a map/reduce approach
+        :param chunk_size: select a chunk size (according to memory constraints)
+        :return:
+        """
+        nts_pol_a = self.beamformer['metadata']['syncADC']['difference']['pol_0']
+        nts_cnt = nts_pol_a / chunk_size
+        # open files
+        keys = ['pol_1', 'pol_0']
+        # init objects
+        self.bf_file_object(keys)
+        # run through files
+        etime = time.time()
+        for cnt in range(nts_cnt):
+            if self.verbose:
+                print('%d of %d' % (cnt + 1, nts_cnt))
+            # divide the data in chunks of this size (either by creating several files,
+            # or by loading only one chunk at a time)
+            start_sync_pol_0 = self.beamformer['metadata']['syncADC']['start']['pol_0']
+            spectra_chunk_pol_0 = self.beamformer['pol_0']['file'].read_chunk(cnt,
+                                                                              chunk_size,
+                                                                              start_sync_pol_0)
+            start_sync_pol_1 = self.beamformer['metadata']['syncADC']['start']['pol_1']
+            spectra_chunk_pol_1 = self.beamformer['pol_1']['file'].read_chunk(cnt,
+                                                                              chunk_size,
+                                                                              start_sync_pol_1)
+            # for each chunk, do the computation and unload the data
+        if self.verbose:
+            print('Reading took %.3f secs' % (time.time() - etime))
+
+    def stokes_I(self, spectra_chunk_pol_a,
+                 spectra_chunk_pol_b,
+                 chunk_size,
+                 no_opt=False,
+                 decimation_factor=1):
+        """
+        Stokes parameters: I = abs(Ex)^2 + abs(Ey)^2
+        :param spectra_chunk_pol_a:
+        :param spectra_chunk_pol_b:
+        :param chunk_size:
+        :param no_opt:
+        :param decimation_factor:
+        :return:
+        """
+        etime = time.time()
+        if no_opt:
+            stokesI = rfiUtils.to_stokesI(spectra_chunk_pol_a,
+                                          spectra_chunk_pol_b,
+                                          decimation_factor)
+            stokesI = np.require(stokesI, np.float32, requirements='C')
+        else:
+            stokesI = rfiUtils.np_to_stokesI(spectra_chunk_pol_a, spectra_chunk_pol_b)
+            stokesI = stokesI.reshape(-1, (chunk_size / decimation_factor),
+                                      decimation_factor).mean(axis=2)
+            # python2.7 don't have tobytes()
+            if python_version > 2:
+                stokesI = stokesI.T.astype(np.float32).tobytes(order='C')
+            else:
+                stokesI = stokesI.T.astype(np.float32).tostring(order='C')
+        if self.verbose:
+            print('Calculating stokesI took %.3f secs' % (time.time() - etime))
+        return stokesI
 
 
     # def read_file(self, start_time=0.0, duration=0.0, polarisation=0):
