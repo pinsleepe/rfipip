@@ -7,6 +7,7 @@
 import h5py
 import numpy as np
 from datetime import datetime
+from rfipip import rfiBlock
 
 
 class RfiH5(object):
@@ -24,6 +25,7 @@ class RfiH5(object):
         self.verbose = False
         self.metadata = {}
         self.clockcounts = None
+        self.freqcounts = None
 
     def init(self):
         """
@@ -99,7 +101,7 @@ class RfiH5(object):
             raise RuntimeError('Not expected data format: '
                                'Nr channels do not match')  # noqa
 
-    def freq_metadata(self):
+    def freq_metadata(self, freq_cent=1391*1e6):
         """
         Frequency specific metadata
         :return: 
@@ -111,8 +113,15 @@ class RfiH5(object):
         self.metadata['clks_per_sec'] = self.metadata['nspectra'] / n_sec
         self.metadata['fs'] = sps
         self.metadata['clk_sync'] = self.file['/TelescopeModel/cbf'].attrs['sync_time']
-        self.metadata['cenfreq'] = self.file['TelescopeModel/cbf'].attrs['center_freq']
+        # self.file['TelescopeModel/cbf'].attrs['center_freq'] gives wrong centre freq
+        self.metadata['cenfreq'] = freq_cent
         self.metadata['bandwidth'] = self.file['TelescopeModel/cbf'].attrs['bandwidth']
+        channel_bw = self.metadata['bandwidth'] / self.metadata['nchannels']
+        upper_freq = freq_cent + ((self.metadata['nchannels'] / 2.0) - 1) * channel_bw
+        lower_freq = freq_cent - self.metadata['nchannels'] / 2.0 * channel_bw
+        self.metadata['freqTop'] = upper_freq
+        self.metadata['freqBottom'] = lower_freq
+        # self.freqcounts =
 
     def fill_observer(self):
         """
@@ -156,7 +165,11 @@ class RfiH5(object):
         start_chunk = start_sync_pol + ts_step
         end_chunk = start_sync_pol + ts_step + chunk_size
         spectra_chunk_pol = self.file['Data/bf_raw'][:, start_chunk:end_chunk, :]
-        return spectra_chunk_pol
+        block = rfiBlock.RfiBlock(spectra_chunk_pol,
+                         times=self.clockcounts[start_chunk:end_chunk],
+                         # freqs=,
+                         tsamp=1.0)
+        return block
 
     #     """
     #     Getting number of channels from each file.
@@ -278,21 +291,7 @@ class RfiH5(object):
     #     """
     #     startTimeMJD = katpoint.Timestamp(self.unix_time)
     #     self.mjd = startTimeMJD.to_mjd()
-    #
-    # def find_freqs(self):
-    #     """
-    #     Find centre, top and bottom frequencies from the file.
-    #     :return:
-    #     """
-    #     freqCent = float(self.p0_data["/TelescopeState/obs_params"][:][6][1].split()[1].strip("'"))
-    #     self.centre_freq = freqCent
-    #
-    #     freqTop = freqCent + (((self.nchans / 2) - 1) * self.channel_bw)
-    #     self.top_freq = freqTop
-    #
-    #     freqBottom = freqCent - ((self.nchans / 2) * self.channel_bw)
-    #     self.bottom_freq = freqBottom
-    #
+
     # def find_radec(self):
     #     """
     #     Find Ra, Dec coordinates for az, el pointing

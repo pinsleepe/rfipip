@@ -18,6 +18,7 @@ from scipy import ndimage
 from ConfigParser import SafeConfigParser
 import os
 from skimage import filters
+from scipy.ndimage import measurements
 
 
 def replaceChar(text):
@@ -180,3 +181,46 @@ def np_to_stokesI(x, y):
     y_i = np.asarray(y[..., 1], dtype=np.float32)
     out = x_r * x_r + x_i * x_i + y_r * y_r + y_i * y_i
     return out
+
+
+def sum_dimension(data, axis=0):
+        """
+
+        :param data: 2D array
+        :param axis:
+        :return:
+        """
+        return data.sum(axis=axis)
+
+
+def apply_threshold(block, threshold):
+    return block < threshold
+
+
+def clean_mask(mask):
+        open_img = open_blob(mask)
+        return close_blob(open_img)
+
+
+def mask_events(close_img):
+    labeled_array, num_features = measurements.label(close_img)
+    # self._count_corrupted(close_img)
+    # to spead up the computation get rid of zeros
+    non_zero_array = labeled_array.nonzero()
+    return labeled_array, num_features, non_zero_array
+
+
+def rfi_per_chunk(block, threshold):
+    mask = apply_threshold(block, threshold)
+    close_img = clean_mask(mask)
+    labeled_array, num_features, non_zero_array = mask_events(close_img)
+    return labeled_array, num_features, non_zero_array
+
+
+# https://github.com/therealvm/rfistats
+def robust_std(data, axis=-1):
+    """
+    Estimate the standard deviation of data from its inter-quartile range.
+    """
+    iqr = np.percentile(data, 75, axis=axis) - np.percentile(data, 25, axis=axis)
+    return iqr / 1.3489795

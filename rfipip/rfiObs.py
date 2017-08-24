@@ -17,9 +17,8 @@
 # import matplotlib.cm as cm
 # import matplotlib.pyplot as plt
 import numpy as np
-from rfipip import rfiH5, rfiUtils
+from rfipip import rfiH5, rfiUtils, rfiDatabase, rfiEvent
 # import pandas as pd
-# from scipy.ndimage import measurements
 import ephem
 import time
 from datetime import datetime
@@ -128,9 +127,9 @@ class RfiObservation(object):
         :return:
         """
         ants = self.beamformer['pol_0']['metadata']['ants']
-        if len(ants) > 1:
-            raise SystemExit('More than 1 antenna: '
-                             'Complete implementation before proceding')
+        # if len(ants) > 1:
+        #     raise SystemExit('More than 1 antenna: '
+        #                      'Complete implementation before proceding')
         source_name = self.beamformer['pol_0']['metadata'][ants[0]]['target']
         right_ascension = self.beamformer['pol_0']['metadata'][ants[0]]['ra']
         declination = self.beamformer['pol_0']['metadata'][ants[0]]['dec']
@@ -272,7 +271,8 @@ class RfiObservation(object):
         start_mjd = ephem.julian_date(ephem.Date(unix_dt)) - 2400000.5  # convert to MJD
         cen_freq = self.beamformer['pol_0']['metadata']['cenfreq']
         bandwidth = self.beamformer['pol_0']['metadata']['bandwidth']
-        channel_bw = bandwidth / self.beamformer['pol_0']['metadata']['nchannels']
+        nchannels = self.beamformer['pol_0']['metadata']['nchannels']
+        channel_bw = bandwidth / nchannels
         if self.verbose:
             print('obsStartTime: %.12f' % start_ts)
             print('obsSyncDate: %s' % unix_dt)
@@ -280,10 +280,8 @@ class RfiObservation(object):
             print('freqCent: %f' % cen_freq)
             print('channelBW: %.10f MHz' % (channel_bw * 1e-6))
 
-        # upper_freq = cen_freq + bandwidth/2. - channel_bw/2.
-        upper_freq = cen_freq + bandwidth / 2.
-        # lower_freq = cen_freq - bandwidth/2.+ channel_bw/2.
-        lower_freq = cen_freq - bandwidth / 2.
+        upper_freq = cen_freq + ((nchannels / 2.0) - 1) * channel_bw
+        lower_freq = cen_freq - nchannels / 2.0 * channel_bw
         # Getting number of spectra from each file.
         nspectra_pol_a = self.beamformer['pol_0']['metadata']['nspectra']
         nspectra_pol_b = self.beamformer['pol_1']['metadata']['nspectra']
@@ -326,6 +324,18 @@ class RfiObservation(object):
             h5_pol.open_file()
             self.beamformer[key]['file'] = h5_pol
 
+    def blocks_in_file(self, chunk_size):
+        """
+        how many block there is in a file
+        :param chunk_size:
+        :return:
+        """
+        nts_pol_a = chunk_size
+        if self._h5_file:
+            nts_pol_a = self.beamformer['metadata']['syncADC']['difference']['pol_0']
+        nts_cnt = nts_pol_a / chunk_size
+        return nts_cnt
+
     def read_chunks(self, chunk_size):
         """
         Numpy works by loading all the data into the memory,
@@ -334,30 +344,30 @@ class RfiObservation(object):
         :param chunk_size: select a chunk size (according to memory constraints)
         :return:
         """
-        nts_pol_a = self.beamformer['metadata']['syncADC']['difference']['pol_0']
-        nts_cnt = nts_pol_a / chunk_size
-        # open files
-        keys = ['pol_1', 'pol_0']
-        # init objects
-        self.bf_file_object(keys)
-        # run through files
-        etime = time.time()
-        for cnt in range(nts_cnt):
+        if self._h5_file:
+            nts_cnt = self.blocks_in_file(chunk_size)
+            # open files
+            keys = ['pol_1', 'pol_0']
+            # init objects
+            self.bf_file_object(keys)
+            # run through files
+            etime = time.time()
+            for cnt in range(nts_cnt):
+                if self.verbose:
+                    print('%d of %d' % (cnt + 1, nts_cnt))
+                # divide the data in chunks of this size (either by creating several files,
+                # or by loading only one chunk at a time)
+                start_sync_pol_0 = self.beamformer['metadata']['syncADC']['start']['pol_0']
+                spectra_chunk_pol_0 = self.beamformer['pol_0']['file'].read_chunk(cnt,
+                                                                                  chunk_size,
+                                                                                  start_sync_pol_0)
+                start_sync_pol_1 = self.beamformer['metadata']['syncADC']['start']['pol_1']
+                spectra_chunk_pol_1 = self.beamformer['pol_1']['file'].read_chunk(cnt,
+                                                                                  chunk_size,
+                                                                                  start_sync_pol_1)
+                # for each chunk, do the computation and unload the data
             if self.verbose:
-                print('%d of %d' % (cnt + 1, nts_cnt))
-            # divide the data in chunks of this size (either by creating several files,
-            # or by loading only one chunk at a time)
-            start_sync_pol_0 = self.beamformer['metadata']['syncADC']['start']['pol_0']
-            spectra_chunk_pol_0 = self.beamformer['pol_0']['file'].read_chunk(cnt,
-                                                                              chunk_size,
-                                                                              start_sync_pol_0)
-            start_sync_pol_1 = self.beamformer['metadata']['syncADC']['start']['pol_1']
-            spectra_chunk_pol_1 = self.beamformer['pol_1']['file'].read_chunk(cnt,
-                                                                              chunk_size,
-                                                                              start_sync_pol_1)
-            # for each chunk, do the computation and unload the data
-        if self.verbose:
-            print('Reading took %.3f secs' % (time.time() - etime))
+                print('Reading took %.3f secs' % (time.time() - etime))
 
     def stokes_I(self, spectra_chunk_pol_a,
                  spectra_chunk_pol_b,
@@ -392,214 +402,92 @@ class RfiObservation(object):
             print('Calculating stokesI took %.3f secs' % (time.time() - etime))
         return stokesI
 
+    def rfi_median(self, block):
+        """
+        Run through entire file and give median value for threshold
+        :param block: np.array
+        :return:
+        """
+        # TODO move to utils
+        chunk_size = block.shape[1]
+        nts_cnt = self.blocks_in_file(chunk_size)
+        obs_val = [rfiUtils.rfi_threshold(block) for _, st in enumerate(nts_cnt)]
+        obs_val2array = np.array(obs_val)
+        self.threshold = np.median(obs_val2array)
 
-    # def read_file(self, start_time=0.0, duration=0.0, polarisation=0):
-    #     """
-    #
-    #     :param start_time: in seconds
-    #     :param duration: in seconds
-    #     :return:
-    #     """
-    #     if self.file:
-    #         if self._fil_file:
-    #             start_sample = start_time / self.file.header.tsamp
-    #             if duration == 0:
-    #                 nsamples = self.file.header.nsamples - start_sample
-    #             else:
-    #                 nsamples = duration / self.file.header.tsamp
-    #             block = self.file.readBlock(start_sample, nsamples)
-    #             self._create_time(start_time, duration, block)
-    #             return block, nsamples
-    #
-    #             # TODO change to channel number
-    #             self.data = self.file.read_filterbank(f_start=f_start, f_stop=f_stop)
-    #             self.freqs_vector = self.file.freqs_vector
-    #         if self._rta_file:
-    #             zero_data = self.file['spectra'][:]
-    #             # strip data and choose frequency channels
-    #             self.data = self._strip_zeros(zero_data)
-    #             # [:, ch_start:ch_stop]
-    #             # assuming that mode doesnt change in observation
-    #             self.mode = self.file['mode'][:][self.time_vector][0]
-    #             self._create_freqs()
-    #         if self._h5_file:
-    #             start_sample = start_time / self.file.sampling_time
-    #             if duration == 0:
-    #                 nsamples = self.file.header.nsamples - start_sample
-    #             else:
-    #                 nsamples = duration / self.file.header.tsamp
+    def read_database(self, path):
+        """
 
-    # def rfi_block(self, start_time, duration):
-    #     """
-    #
-    #     :param start_time:
-    #     :param duration:
-    #     :return:
-    #     """
-    #     # if self._fil_file:
-    #     #     block, _ = self.read_time_freq(start_time, duration)
-    #     #     return rfiUtils.rfi_threshold(block)
-    #
-    # def rfi_median(self, vec_length):
-    #     """
-    #     Run through entire file and give median value for threshold
-    #     :param vec_length: int, how many block there is in a file,
-    #                         need some logic...
-    #     :return:
-    #     """
-    #     if self._fil_file:
-    #         start_vector, duration = self.time_vector(vec_length)
-    #         obs_val = [self.rfi_block(st, duration) for _, st in enumerate(start_vector)]
-    #         obs_val2array = np.array(obs_val)
-    #         self.threshold = np.median(obs_val2array)
-    #
-    # def sum_dimension(self,
-    #                   data,
-    #                   axis=0):
-    #     """
-    #
-    #     :param data: 2D array
-    #     :param axis:
-    #     :return:
-    #     """
-    #     return data.sum(axis=axis)
-    #
-    # def read_bandpass(self):
-    #     """
-    #
-    #     :param data:
-    #     :return:
-    #     """
-    #     # if self._rta_file:
-    #     #     if self.data is not None:
-    #     #         self.bandpass = self.data.sum(axis=0)
-    #     # if self._fil_file:
-    #     #     self.bandpass = self.file.bandpass()
-    #
-    # def read_database(self, path):
-    #     """
-    #
-    #     :param path:
-    #     :return:
-    #     """
-    #     # TODO download from google docs
-    #     rfi_db = rfiDatabase.RfiDatabase()
-    #     rfi_db.write_dict([path])
-    #     # bands = rfiDb.dictionary.keys()
-    #     int_bands = [rfi_db.dictionary[k]['band'] for k in rfi_db.dictionary.keys()]
-    #     int_dict = dict(zip(int_bands, rfi_db.dictionary.keys()))
-    #     self.database = rfi_db
-    #     return int_dict
-    #
+        :param path:
+        :return:
+        """
+        # TODO download from google docs
+        rfi_db = rfiDatabase.RfiDatabase()
+        rfi_db.write_dict([path])
+        # bands = rfiDb.dictionary.keys()
+        int_bands = [rfi_db.dictionary[k]['band'] for k in rfi_db.dictionary.keys()]
+        int_dict = dict(zip(int_bands, rfi_db.dictionary.keys()))
+        self.database = rfi_db
+        return int_dict
+
     # def _count_corrupted(self, close_img):
     #     """
     #
-    #     :param corrupted_samples: fil_rfiObs
     #     :param close_img:
     #     :return: int_dict
     #     """
-    #     if self._fil_file:
-    #         corrupt_block = np.count_nonzero(close_img == 1)
-    #         self.corrupted_samples += corrupt_block
-    #
-    # def apply_threshold(self, block):
-    #     """
-    #
-    #     :param block:
-    #     :return:
-    #     """
-    #     return block < self.threshold
-    #
-    # def clean_mask(self, mask):
-    #     """
-    #
-    #     :param mask:
-    #     :return:
-    #     """
-    #     open_img = rfiUtils.open_blob(mask)
-    #     return rfiUtils.close_blob(open_img)
-    #
-    # def mask_events(self, close_img):
-    #     """
-    #
-    #     :param close_img:
-    #     :return:
-    #     """
-    #     if self._fil_file:
-    #         labeled_array, num_features = measurements.label(close_img)
-    #         self._count_corrupted(close_img)
-    #         non_zero_array = labeled_array.nonzero()
-    #         return labeled_array, num_features, non_zero_array
-    #
-    # def percentage_rfi(self, vec_length):
-    #     """
-    #
-    #     :param vec_length:
-    #     :return:
-    #     """
-    #     if self._fil_file:
-    #         _, duration = self.time_vector(vec_length)
-    #         num_sam = long(duration / self.file.header.tsamp)
-    #         file_sam = vec_length * num_sam * self.file.header.nchans
-    #         return rfiUtils.percentage(self.corrupted_samples, file_sam)
-    #
-    # def find_rfi_events(self, block):
-    #     """
-    #
-    #     :param block:
-    #     :return:
-    #     """
-    #     if self._fil_file:
-    #         mask = self.apply_threshold(block)
-    #         close_img = self.clean_mask(mask)
-    #         labeled_array, num_features, non_zero_array = self.mask_events(close_img)
-    #         return labeled_array, num_features, non_zero_array
-    #
-    # def block_events(self, block, int_dict):
-    #     """
-    #
-    #     :param block:
-    #     :param int_dict:
-    #     :return:
-    #     """
-    #     if self._fil_file:
-    #         labeled_array, num_features, non_zero_array = self.find_rfi_events(block)
-    #         feature_range = np.linspace(1, num_features, num=num_features)
-    #         rfi_evs = [rfiEvent.RfiEvent(ev, labeled_array, non_zero_array)
-    #                    for ev in feature_range]
-    #         t_df = self.time[1] - self.time[0]
-    #         [ev.finetune_attr(self.file.header.foff,
-    #                           self.freqs,
-    #                           t_df, self.time) for ev in rfi_evs]
-    #         [ev.find_bands(int_dict) for ev in rfi_evs]
-    #         [ev.find_culprit(self.database.dictionary, int_dict) for ev in rfi_evs]
-    #         return rfi_evs
-    #
-    # def find_obs_event(self, start_time, duration, int_dict):
-    #     """
-    #
-    #     :param start_time:
-    #     :param duration:
-    #     :return:
-    #     """
-    #     if self._fil_file:
-    #         block, num_sam = self.read_time_freq(start_time,
-    #                                              duration)
-    #         return self.block_events(block, int_dict)
-    #
-    # def obs_events(self, vec_length, int_dict):
-    #     """
-    #
-    #     :param vec_length:
-    #     :param int_dict:
-    #     :return:
-    #     """
-    #     if self._fil_file:
-    #         start_vector, duration = self.time_vector(vec_length)
-    #         self.events = [self.find_obs_event(start_vector[sv],
-    #                                            duration,
-    #                                            int_dict) for sv in range(vec_length)]
-    #
+    #     corrupt_block = np.count_nonzero(close_img == 1)
+    #     self.corrupted_samples += corrupt_block
+
+    def percentage_rfi(self, vec_length):
+        if self._fil_file:
+            _, duration = self.time_vector(vec_length)
+            num_sam = long(duration / self.file.header.tsamp)
+            file_sam = vec_length * num_sam * self.file.header.nchans
+            return rfiUtils.percentage(self.corrupted_samples, file_sam)
+
+    def block_events(self, block, threshold, int_dict):
+        labeled_array, num_features, non_zero_array = rfiUtils.rfi_per_chunk(block,
+                                                                             threshold)
+        feature_range = np.linspace(1, num_features, num=num_features)
+        rfi_evs = [rfiEvent.RfiEvent(ev,
+                                     labeled_array,
+                                     non_zero_array) for ev in feature_range]
+        if self._fil_file:
+            t_df = self.time[1] - self.time[0]
+        [ev.finetune_attr(self.file.header.foff,
+                          self.freqs,
+                          t_df,
+                          self.time) for ev in rfi_evs]
+        [ev.find_bands(int_dict) for ev in rfi_evs]
+        [ev.find_culprit(self.database.dictionary, int_dict) for ev in rfi_evs]
+        return rfi_evs
+
+    def find_obs_event(self, start_time, duration, int_dict):
+        """
+
+        :param start_time:
+        :param duration:
+        :return:
+        """
+        if self._fil_file:
+            block, num_sam = self.read_time_freq(start_time,
+                                                 duration)
+            return self.block_events(block, int_dict)
+
+    def obs_events(self, vec_length, int_dict):
+        """
+
+        :param vec_length:
+        :param int_dict:
+        :return:
+        """
+        if self._fil_file:
+            start_vector, duration = self.time_vector(vec_length)
+            self.events = [self.find_obs_event(start_vector[sv],
+                                               duration,
+                                               int_dict) for sv in range(vec_length)]
+
     # def write2csv(self,
     #               h5_name='rfi_measurements.h5',
     #               return_h5=False):

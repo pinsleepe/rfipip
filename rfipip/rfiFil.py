@@ -19,6 +19,7 @@ class RfiFil(object):
         self.file = None
         self.observer = observer
         self.metadata = {}
+        self.bandpass = None
 
         # self.freqs_vector = None
         # self.time_vector = None
@@ -191,12 +192,11 @@ class RfiFil(object):
     #     """
     #     raw = self.file.collapse()  # collapse freq channels
     #     self.time_series = raw
-    #
-    # def read_bandpass(self):
-    #     """
-    #
-    #     :param data:
-    #     :return:
-    #     """
-    #     self.bandpass = self.file.bandpass()
-    #
+
+    def read_bandpass(self):
+        """
+
+        :param data:
+        :return:
+        """
+        self.bandpass = self.file.bandpass()

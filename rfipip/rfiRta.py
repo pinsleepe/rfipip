@@ -19,6 +19,8 @@ rta_modes = {'1': {'n_chan': 32768,
 class RfiRta(object):
     def __init__(self, path):
         self.path = path
+        self.data = None
+        self.mode = None
 
     def _open_file(self):
         """
@@ -26,4 +28,15 @@ class RfiRta(object):
         :return:
         """
         self.file = h5py.File(self.path, mode='r+')
+
+
+
+    def read_file(self):
+        zero_data = self.file['spectra'][:]
+        # strip data and choose frequency channels
+        self.data = self._strip_zeros(zero_data)
+        # [:, ch_start:ch_stop]
+        # assuming that mode doesnt change in observation
+        self.mode = self.file['mode'][:][self.time_vector][0]
+        self._create_freqs()
 
